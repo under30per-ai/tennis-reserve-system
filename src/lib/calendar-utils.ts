@@ -1,5 +1,5 @@
-import { startOfWeek, endOfWeek, eachDayOfInterval, addWeeks, startOfMonth, endOfMonth, getDay, getDate, format, addDays, differenceInWeeks, parseISO } from 'date-fns';
-import { LessonSlot, LessonInstance, DayOfWeek } from '@/types';
+import { startOfWeek, endOfWeek, eachDayOfInterval, addWeeks, startOfMonth, endOfMonth, getDay, getDate, format, differenceInWeeks, parseISO } from 'date-fns';
+import { LessonSlot, LessonInstance } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
 
 export function getWeekDays(date: Date): Date[] {

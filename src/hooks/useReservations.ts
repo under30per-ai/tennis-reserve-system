@@ -1,17 +1,15 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { Reservation, ReservationWithDetails } from '@/types';
 import { reservationUseCases } from '@/application/usecases';
 
 export default function useReservations() {
-  const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [reservations, setReservations] = useState<Reservation[]>(() => reservationUseCases.getAll());
 
   const refresh = useCallback(() => {
     setReservations(reservationUseCases.getAll());
   }, []);
-
-  useEffect(() => { refresh(); }, [refresh]);
 
   const makeReservation = useCallback((memberId: string, lessonInstanceId: string): Reservation => {
     const reservation = reservationUseCases.makeReservation(memberId, lessonInstanceId);

@@ -18,7 +18,7 @@ import { DAY_LABELS } from '@/lib/constants';
 export default function RecordsPage() {
   const router = useRouter();
   const { instances, getInstanceWithDetails } = useLessonInstances();
-  const { records, getRecordForInstance } = useLessonRecords();
+  const { getRecordForInstance } = useLessonRecords();
   const [weekOffset, setWeekOffset] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
 

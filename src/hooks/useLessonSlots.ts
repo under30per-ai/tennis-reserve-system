@@ -1,17 +1,15 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { LessonSlot } from '@/types';
 import { lessonSlotUseCases } from '@/application/usecases';
 
 export default function useLessonSlots() {
-  const [lessonSlots, setLessonSlots] = useState<LessonSlot[]>([]);
+  const [lessonSlots, setLessonSlots] = useState<LessonSlot[]>(() => lessonSlotUseCases.getAll());
 
   const refresh = useCallback(() => {
     setLessonSlots(lessonSlotUseCases.getAll());
   }, []);
-
-  useEffect(() => { refresh(); }, [refresh]);
 
   const getLessonSlot = useCallback((id: string) => lessonSlotUseCases.getById(id), []);
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import useCoaches from '@/hooks/useCoaches';
 import useToast from '@/hooks/useToast';
@@ -18,12 +18,7 @@ export default function EditCoachPage() {
   const params = useParams();
   const coachId = params.coachId as string;
 
-  const [coach, setCoach] = useState<Coach | null>(null);
-
-  useEffect(() => {
-    const c = getCoach(coachId);
-    if (c) setCoach(c);
-  }, [coachId, getCoach]);
+  const [coach, setCoach] = useState<Coach | null>(() => getCoach(coachId));
 
   if (!coach) return <LoadingSpinner />;
 

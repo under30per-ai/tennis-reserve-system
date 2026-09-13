@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { format, parseISO } from 'date-fns';
 import { ja } from 'date-fns/locale';
@@ -38,53 +38,54 @@ export default function RecordEditPage() {
   const { getMember } = useMembers();
   const toast = useToast();
 
-  const [theme, setTheme] = useState('');
-  const [content, setContent] = useState('');
-  const [memberNotes, setMemberNotes] = useState<MemberNoteForm[]>([]);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
   const instanceDetails = useMemo(() => getInstanceWithDetails(instanceId), [instanceId, getInstanceWithDetails]);
   const existingRecord = useMemo(() => getRecordForInstance(instanceId), [instanceId, getRecordForInstance]);
 
-  useEffect(() => {
-    if (!instanceDetails) return;
-
+  const initialFormData = useMemo(() => {
+    if (!instanceDetails) return { theme: '', content: '', memberNotes: [] as MemberNoteForm[] };
     if (existingRecord) {
-      setTheme(existingRecord.theme);
-      setContent(existingRecord.content);
-
-      const notes = existingRecord.memberNotes.map(note => {
-        const member = getMember(note.memberId);
-        return {
-          memberId: note.memberId,
-          memberName: member?.name ?? '不明',
-          avatarColor: member?.avatarColor ?? '#888',
-          attendance: note.attendance,
-          performanceRating: note.performanceRating,
-          goodPoints: note.goodPoints,
-          improvementPoints: note.improvementPoints,
-          memo: note.memo,
-        };
-      });
-      setMemberNotes(notes);
-    } else {
-      const reservations = getReservationsForInstance(instanceId);
-      const notes = reservations.map(r => {
-        const member = getMember(r.memberId);
+      return {
+        theme: existingRecord.theme,
+        content: existingRecord.content,
+        memberNotes: existingRecord.memberNotes.map(note => {
+          const m = getMember(note.memberId);
+          return {
+            memberId: note.memberId,
+            memberName: m?.name ?? '不明',
+            avatarColor: m?.avatarColor ?? '#888',
+            attendance: note.attendance,
+            performanceRating: note.performanceRating,
+            goodPoints: note.goodPoints,
+            improvementPoints: note.improvementPoints,
+            memo: note.memo,
+          };
+        }),
+      };
+    }
+    const reservations = getReservationsForInstance(instanceId);
+    return {
+      theme: '',
+      content: '',
+      memberNotes: reservations.map(r => {
+        const m = getMember(r.memberId);
         return {
           memberId: r.memberId,
-          memberName: member?.name ?? '不明',
-          avatarColor: member?.avatarColor ?? '#888',
+          memberName: m?.name ?? '不明',
+          avatarColor: m?.avatarColor ?? '#888',
           attendance: 'present' as AttendanceStatus,
           performanceRating: 3,
           goodPoints: '',
           improvementPoints: '',
           memo: '',
         };
-      });
-      setMemberNotes(notes);
-    }
+      }),
+    };
   }, [instanceDetails, existingRecord, instanceId, getMember, getReservationsForInstance]);
+
+  const [theme, setTheme] = useState(() => initialFormData.theme);
+  const [content, setContent] = useState(() => initialFormData.content);
+  const [memberNotes, setMemberNotes] = useState<MemberNoteForm[]>(() => initialFormData.memberNotes);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const updateMemberNote = (index: number, field: keyof MemberNoteForm, value: string | number) => {
     setMemberNotes(prev => prev.map((note, i) => i === index ? { ...note, [field]: value } : note));

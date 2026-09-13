@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { format, parseISO } from 'date-fns';
 import { ja } from 'date-fns/locale';
@@ -12,7 +12,6 @@ import Card, { CardTitle } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
-import Badge from '@/components/ui/Badge';
 import { LevelBadge } from '@/components/ui/Badge';
 import StarRating from '@/components/ui/StarRating';
 import { Table, TableHeader, TableRow, TableHead, TableCell } from '@/components/ui/Table';
@@ -39,13 +38,8 @@ export default function MemberDetailPage() {
   const params = useParams();
   const memberId = params.memberId as string;
 
-  const [member, setMember] = useState<Member | null>(null);
+  const [member, setMember] = useState<Member | null>(() => getMember(memberId));
   const [activeTab, setActiveTab] = useState<Tab>('profile');
-
-  useEffect(() => {
-    const m = getMember(memberId);
-    if (m) setMember(m);
-  }, [memberId, getMember]);
 
   const history = useMemo(() => getMemberLessonHistory(memberId), [memberId, getMemberLessonHistory]);
 

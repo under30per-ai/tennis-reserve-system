@@ -1,17 +1,15 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { Member, LessonLevel } from '@/types';
 import { memberUseCases } from '@/application/usecases';
 
 export default function useMembers() {
-  const [members, setMembers] = useState<Member[]>([]);
+  const [members, setMembers] = useState<Member[]>(() => memberUseCases.getAll());
 
   const refresh = useCallback(() => {
     setMembers(memberUseCases.getAll());
   }, []);
-
-  useEffect(() => { refresh(); }, [refresh]);
 
   const getMember = useCallback((id: string) => memberUseCases.getById(id), []);
 

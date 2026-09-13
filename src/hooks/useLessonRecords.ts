@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import {
   LessonRecord,
   LessonRecordWithDetails,
@@ -10,13 +10,11 @@ import {
 import { lessonRecordUseCases } from '@/application/usecases';
 
 export default function useLessonRecords() {
-  const [records, setRecords] = useState<LessonRecord[]>([]);
+  const [records, setRecords] = useState<LessonRecord[]>(() => lessonRecordUseCases.getAll());
 
   const refresh = useCallback(() => {
     setRecords(lessonRecordUseCases.getAll());
   }, []);
-
-  useEffect(() => { refresh(); }, [refresh]);
 
   const getRecordForInstance = useCallback((instanceId: string): LessonRecord | null => {
     return records.find(r => r.lessonInstanceId === instanceId) ?? null;

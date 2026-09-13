@@ -55,8 +55,8 @@ export default function ReserveConfirmPage() {
         }
         router.push('/reserve/complete');
       }
-    } catch (err: any) {
-      toast.error(err.message || (isTransferMode ? '振替に失敗しました' : '予約に失敗しました'));
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : (isTransferMode ? '振替に失敗しました' : '予約に失敗しました'));
     }
   };
 

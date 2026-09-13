@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import useLessonSlots from '@/hooks/useLessonSlots';
 import useCoaches from '@/hooks/useCoaches';
@@ -23,12 +23,10 @@ export default function EditLessonPage() {
   const params = useParams();
   const slotId = params.slotId as string;
 
-  const [slot, setSlot] = useState<LessonSlot | null>(null);
-
-  useEffect(() => {
+  const [slot, setSlot] = useState<LessonSlot | null>(() => {
     const s = getLessonSlot(slotId);
-    if (s) setSlot({ ...s, recurrenceType: s.recurrenceType ?? 'weekly' });
-  }, [slotId, getLessonSlot]);
+    return s ? { ...s, recurrenceType: s.recurrenceType ?? 'weekly' } : null;
+  });
 
   if (!slot) return <LoadingSpinner />;
 

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import useAuth from '@/hooks/useAuth';
 import useMembers from '@/hooks/useMembers';
 import useToast from '@/hooks/useToast';
@@ -11,7 +11,7 @@ import { LevelBadge } from '@/components/ui/Badge';
 import Badge from '@/components/ui/Badge';
 import NetDivider from '@/components/tennis/NetDivider';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
-import { LEVEL_LABELS, MEMBERSHIP_LABELS } from '@/lib/constants';
+import { MEMBERSHIP_LABELS } from '@/lib/constants';
 import { formatDate, getInitials } from '@/lib/utils';
 import { Member } from '@/types';
 
@@ -20,15 +20,10 @@ export default function ProfilePage() {
   const { getMember, updateMember } = useMembers();
   const toast = useToast();
 
-  const [member, setMember] = useState<Member | null>(null);
+  const [member, setMember] = useState<Member | null>(() => {
+    return user?.memberId ? getMember(user.memberId) : null;
+  });
   const [isEditing, setIsEditing] = useState(false);
-
-  useEffect(() => {
-    if (user?.memberId) {
-      const m = getMember(user.memberId);
-      if (m) setMember(m);
-    }
-  }, [user, getMember]);
 
   if (!member) return <LoadingSpinner />;
 

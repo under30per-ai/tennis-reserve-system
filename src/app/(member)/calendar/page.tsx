@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { format, addWeeks, subWeeks, addMonths, subMonths, isSameMonth, isToday, isSameDay } from 'date-fns';
+import { format, addWeeks, subWeeks, addMonths, subMonths, isSameMonth, isToday } from 'date-fns';
 import useLessonInstances from '@/hooks/useLessonInstances';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';

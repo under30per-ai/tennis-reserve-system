@@ -1,17 +1,15 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { Court } from '@/types';
 import { courtUseCases } from '@/application/usecases';
 
 export default function useCourts() {
-  const [courts, setCourts] = useState<Court[]>([]);
+  const [courts, setCourts] = useState<Court[]>(() => courtUseCases.getAll());
 
   const refresh = useCallback(() => {
     setCourts(courtUseCases.getAll());
   }, []);
-
-  useEffect(() => { refresh(); }, [refresh]);
 
   const getCourt = useCallback((id: string) => courtUseCases.getById(id), []);
 

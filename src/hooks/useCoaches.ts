@@ -1,17 +1,15 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { Coach } from '@/types';
 import { coachUseCases } from '@/application/usecases';
 
 export default function useCoaches() {
-  const [coaches, setCoaches] = useState<Coach[]>([]);
+  const [coaches, setCoaches] = useState<Coach[]>(() => coachUseCases.getAll());
 
   const refresh = useCallback(() => {
     setCoaches(coachUseCases.getAll());
   }, []);
-
-  useEffect(() => { refresh(); }, [refresh]);
 
   const getCoach = useCallback((id: string) => coachUseCases.getById(id), []);
 

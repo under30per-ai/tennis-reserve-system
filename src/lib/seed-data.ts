@@ -18,7 +18,7 @@ export function seedDataIfNeeded(): void {
   const courts = createCourts();
   const coaches = createCoaches();
   const members = createMembers();
-  const lessonSlots = createLessonSlots(coaches, courts);
+  const lessonSlots = createLessonSlots();
 
   setAll(STORAGE_KEYS.COURTS, courts);
   setAll(STORAGE_KEYS.COACHES, coaches);
@@ -143,7 +143,7 @@ function createMembers(): Member[] {
   }));
 }
 
-function createLessonSlots(coaches: Coach[], courts: Court[]): LessonSlot[] {
+function createLessonSlots(): LessonSlot[] {
   const now = new Date().toISOString();
   const slots: Omit<LessonSlot, 'createdAt' | 'updatedAt'>[] = [
     { id: 'slot-1', title: '初級クラスA', level: 'beginner', coachId: 'coach-1', courtId: 'court-1', dayOfWeek: 1 as DayOfWeek, startTime: '10:00', endTime: '11:30', maxCapacity: 8, isRecurring: true, recurrenceType: 'weekly', recurrenceStartDate: '2024-04-01', recurrenceEndDate: null, specificDate: null, monthlyWeekNumber: null, isActive: true },

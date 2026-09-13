@@ -5,14 +5,13 @@ import { useRouter } from 'next/navigation';
 import useAuth from '@/hooks/useAuth';
 import useReservations from '@/hooks/useReservations';
 import useToast from '@/hooks/useToast';
-import Card, { CardTitle } from '@/components/ui/Card';
+import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Tabs from '@/components/ui/Tabs';
 import Badge from '@/components/ui/Badge';
 import { LevelBadge } from '@/components/ui/Badge';
 import EmptyState from '@/components/ui/EmptyState';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
-import NetDivider from '@/components/tennis/NetDivider';
 import { RESERVATION_STATUS_LABELS } from '@/lib/constants';
 import { formatDate, toISODateString } from '@/lib/utils';
 

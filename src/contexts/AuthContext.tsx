@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import { AuthUser } from '@/types';
 import { authUseCases } from '@/application/usecases';
 
@@ -16,16 +16,8 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const stored = authUseCases.getStoredUser();
-    if (stored) {
-      setUser(stored);
-    }
-    setLoading(false);
-  }, []);
+  const [user, setUser] = useState<AuthUser | null>(() => authUseCases.getStoredUser());
+  const [loading] = useState(false);
 
   const login = useCallback((email: string, password: string, role: 'member' | 'admin'): boolean => {
     const loggedInUser = authUseCases.login(email, password, role);

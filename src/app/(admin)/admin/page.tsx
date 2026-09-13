@@ -97,7 +97,7 @@ export default function AdminDashboardPage() {
           <CardTitle>週間予約推移</CardTitle>
           <NetDivider className="!my-3" />
           <div className="flex items-end gap-2 h-40 mt-4">
-            {stats.weeklyTrend.map((day, i) => (
+            {stats.weeklyTrend.map((day) => (
               <div key={day.date} className="flex-1 flex flex-col items-center gap-1">
                 <span className="text-xs text-gray-500">{day.count}</span>
                 <div
