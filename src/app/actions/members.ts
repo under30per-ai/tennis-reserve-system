@@ -1,6 +1,6 @@
 'use server';
 
-import crypto from 'crypto';
+import { randomInt } from 'node:crypto';
 import { db } from '@/db';
 import { members, emailVerifications } from '@/db/schema';
 import { toMember } from '@/db/mappers';
@@ -8,6 +8,7 @@ import { eq, or, ilike, and, gt } from 'drizzle-orm';
 import type { Member, LessonLevel } from '@/domain/models';
 import { getRandomAvatarColor } from '@/lib/utils';
 import { sendVerificationCode } from '@/lib/email';
+import { validateEmail, validateRequired, validatePhone } from '@/lib/validators';
 
 export async function getMembers(): Promise<Member[]> {
   const rows = await db.select().from(members);
@@ -92,6 +93,22 @@ export async function registerMember(data: {
   phone: string;
   password: string;
 }): Promise<{ success: true; email: string } | { success: false; error: string }> {
+  // Server-side validation
+  const nameError = validateRequired(data.name, '氏名');
+  if (nameError) return { success: false, error: nameError };
+
+  const nameKanaError = validateRequired(data.nameKana, 'フリガナ');
+  if (nameKanaError) return { success: false, error: nameKanaError };
+
+  const emailError = validateEmail(data.email);
+  if (emailError) return { success: false, error: emailError };
+
+  const phoneError = validatePhone(data.phone);
+  if (phoneError) return { success: false, error: phoneError };
+
+  const passwordError = validateRequired(data.password, 'パスワード');
+  if (passwordError) return { success: false, error: passwordError };
+
   const existing = await getMemberByEmail(data.email);
   if (existing) {
     return { success: false, error: 'このメールアドレスは既に登録されています' };
@@ -100,7 +117,7 @@ export async function registerMember(data: {
   // Delete any existing verification for this email
   await db.delete(emailVerifications).where(eq(emailVerifications.email, data.email));
 
-  const code = String(crypto.randomInt(100000, 999999));
+  const code = String(randomInt(100000, 999999));
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
   await db.insert(emailVerifications).values({
@@ -113,7 +130,13 @@ export async function registerMember(data: {
     expiresAt,
   });
 
-  await sendVerificationCode(data.email, code);
+  try {
+    await sendVerificationCode(data.email, code);
+  } catch {
+    // メール送信失敗時は仮登録レコードを削除
+    await db.delete(emailVerifications).where(eq(emailVerifications.email, data.email));
+    return { success: false, error: 'メール送信に失敗しました。しばらく経ってから再度お試しください。' };
+  }
 
   return { success: true, email: data.email };
 }
@@ -191,7 +214,7 @@ export async function resendVerificationCode(email: string): Promise<{ success: 
   }
 
   const verification = existing[0];
-  const code = String(crypto.randomInt(100000, 999999));
+  const code = String(randomInt(100000, 999999));
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
   await db.delete(emailVerifications).where(eq(emailVerifications.email, email));
