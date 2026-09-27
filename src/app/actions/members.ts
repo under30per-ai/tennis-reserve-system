@@ -113,12 +113,7 @@ export async function registerMember(data: {
     expiresAt,
   });
 
-  try {
-    await sendVerificationCode(data.email, code);
-  } catch (err) {
-    console.error('Resend error:', err);
-    return { success: false, error: `メール送信に失敗しました: ${err instanceof Error ? err.message : String(err)}` };
-  }
+  await sendVerificationCode(data.email, code);
 
   return { success: true, email: data.email };
 }
