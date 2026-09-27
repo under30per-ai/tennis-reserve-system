@@ -16,7 +16,7 @@ export default function MemberHeader() {
 
   return (
     <header className="bg-white border-b border-court-grass/20 sticky top-0 z-40">
-      <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
+      <div className="px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
         <div className="flex items-center gap-2" onClick={() => router.push('/dashboard')} role="button" tabIndex={0}>
           <div className="bg-court-green rounded-full p-1.5">
             <TennisBallIcon size={20} />
