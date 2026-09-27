@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { startOfWeek, endOfWeek, addWeeks, format, parseISO } from 'date-fns';
 import { ja } from 'date-fns/locale';
@@ -13,12 +13,20 @@ import Badge from '@/components/ui/Badge';
 import { LevelBadge } from '@/components/ui/Badge';
 import { Table, TableHeader, TableRow, TableHead, TableCell } from '@/components/ui/Table';
 import EmptyState from '@/components/ui/EmptyState';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { DAY_LABELS } from '@/lib/constants';
+import { LessonInstanceWithDetails, LessonRecord } from '@/types';
+
+interface DisplayItem {
+  instance: { id: string; date: string; startTime: string; endTime: string; isCancelled: boolean };
+  details: LessonInstanceWithDetails | null;
+  record: LessonRecord | null;
+}
 
 export default function RecordsPage() {
   const router = useRouter();
-  const { instances, getInstanceWithDetails } = useLessonInstances();
-  const { getRecordForInstance } = useLessonRecords();
+  const { instances, getInstanceWithDetails, loading } = useLessonInstances();
+  const { getRecordForInstance, loading: recordsLoading } = useLessonRecords();
   const [weekOffset, setWeekOffset] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -33,53 +41,80 @@ export default function RecordsPage() {
     };
   }, [weekOffset]);
 
-  const weekInstances = useMemo(() => {
-    const wsStr = format(weekStart, 'yyyy-MM-dd');
-    const weStr = format(weekEnd, 'yyyy-MM-dd');
-    return instances
-      .filter(i => i.date >= wsStr && i.date <= weStr && !i.isCancelled)
-      .map(i => {
-        const details = getInstanceWithDetails(i.id);
-        const record = getRecordForInstance(i.id);
-        return { instance: i, details, record };
-      })
-      .filter(item => item.details !== null)
-      .sort((a, b) => {
-        const dateCompare = a.instance.date.localeCompare(b.instance.date);
-        if (dateCompare !== 0) return dateCompare;
-        return a.instance.startTime.localeCompare(b.instance.startTime);
-      });
+  const [weekInstances, setWeekInstances] = useState<DisplayItem[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadWeekInstances = async () => {
+      const wsStr = format(weekStart, 'yyyy-MM-dd');
+      const weStr = format(weekEnd, 'yyyy-MM-dd');
+      const filtered = instances.filter(i => i.date >= wsStr && i.date <= weStr && !i.isCancelled);
+      const items = await Promise.all(
+        filtered.map(async i => {
+          const details = await getInstanceWithDetails(i.id);
+          const record = await getRecordForInstance(i.id);
+          return { instance: i, details, record };
+        })
+      );
+      if (!cancelled) {
+        setWeekInstances(
+          items
+            .filter(item => item.details !== null)
+            .sort((a, b) => {
+              const dateCompare = a.instance.date.localeCompare(b.instance.date);
+              if (dateCompare !== 0) return dateCompare;
+              return a.instance.startTime.localeCompare(b.instance.startTime);
+            })
+        );
+      }
+    };
+    loadWeekInstances();
+    return () => { cancelled = true; };
   }, [instances, weekStart, weekEnd, getInstanceWithDetails, getRecordForInstance]);
 
   // Search results: when searching, show all instances matching the query across all dates
-  const searchResults = useMemo(() => {
-    if (!searchQuery.trim()) return null;
-    const q = searchQuery.toLowerCase();
+  const [searchResults, setSearchResults] = useState<DisplayItem[] | null>(null);
 
-    return instances
-      .filter(i => !i.isCancelled)
-      .map(i => {
-        const details = getInstanceWithDetails(i.id);
-        const record = getRecordForInstance(i.id);
-        return { instance: i, details, record };
-      })
-      .filter(item => {
-        if (!item.details) return false;
-        const lessonTitle = item.details.lessonSlot.title.toLowerCase();
-        const coachName = item.details.coach.name.toLowerCase();
-        const theme = item.record?.theme?.toLowerCase() || '';
-        const content = item.record?.content?.toLowerCase() || '';
-        return lessonTitle.includes(q) || coachName.includes(q) || theme.includes(q) || content.includes(q);
-      })
-      .sort((a, b) => {
-        const dateCompare = b.instance.date.localeCompare(a.instance.date);
-        if (dateCompare !== 0) return dateCompare;
-        return a.instance.startTime.localeCompare(b.instance.startTime);
-      });
+  useEffect(() => {
+    if (!searchQuery.trim()) return;
+    let cancelled = false;
+    const loadSearchResults = async () => {
+      const q = searchQuery.toLowerCase();
+      const filtered = instances.filter(i => !i.isCancelled);
+      const items = await Promise.all(
+        filtered.map(async i => {
+          const details = await getInstanceWithDetails(i.id);
+          const record = await getRecordForInstance(i.id);
+          return { instance: i, details, record };
+        })
+      );
+      if (!cancelled) {
+        setSearchResults(
+          items
+            .filter(item => {
+              if (!item.details) return false;
+              const lessonTitle = item.details.lessonSlot.title.toLowerCase();
+              const coachName = item.details.coach.name.toLowerCase();
+              const theme = item.record?.theme?.toLowerCase() || '';
+              const content = item.record?.content?.toLowerCase() || '';
+              return lessonTitle.includes(q) || coachName.includes(q) || theme.includes(q) || content.includes(q);
+            })
+            .sort((a, b) => {
+              const dateCompare = b.instance.date.localeCompare(a.instance.date);
+              if (dateCompare !== 0) return dateCompare;
+              return a.instance.startTime.localeCompare(b.instance.startTime);
+            })
+        );
+      }
+    };
+    loadSearchResults();
+    return () => { cancelled = true; };
   }, [searchQuery, instances, getInstanceWithDetails, getRecordForInstance]);
 
   const isSearching = searchQuery.trim().length > 0;
   const displayItems = isSearching ? (searchResults ?? []) : weekInstances;
+
+  if (loading || recordsLoading) return <LoadingSpinner />;
 
   return (
     <div className="space-y-4">
@@ -93,11 +128,11 @@ export default function RecordsPage() {
           <Input
             placeholder="レッスン名・コーチ名・テーマ・内容で検索..."
             value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
+            onChange={e => { setSearchQuery(e.target.value); if (!e.target.value.trim()) setSearchResults(null); }}
           />
           {searchQuery && (
             <button
-              onClick={() => setSearchQuery('')}
+              onClick={() => { setSearchQuery(''); setSearchResults(null); }}
               className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

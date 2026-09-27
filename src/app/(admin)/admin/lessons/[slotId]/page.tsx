@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import useLessonSlots from '@/hooks/useLessonSlots';
 import useCoaches from '@/hooks/useCoaches';
@@ -15,33 +15,47 @@ import { LEVEL_LABELS, DAY_LABELS, RECURRENCE_TYPE_LABELS } from '@/lib/constant
 import { LessonSlot, LessonLevel, DayOfWeek, RecurrenceType } from '@/types';
 
 export default function EditLessonPage() {
-  const { getLessonSlot, updateLessonSlot } = useLessonSlots();
-  const { coaches } = useCoaches();
-  const { courts } = useCourts();
+  const { getLessonSlot, updateLessonSlot, loading: slotsLoading } = useLessonSlots();
+  const { coaches, loading: coachesLoading } = useCoaches();
+  const { courts, loading: courtsLoading } = useCourts();
   const toast = useToast();
   const router = useRouter();
   const params = useParams();
   const slotId = params.slotId as string;
 
-  const [slot, setSlot] = useState<LessonSlot | null>(() => {
-    const s = getLessonSlot(slotId);
-    return s ? { ...s, recurrenceType: s.recurrenceType ?? 'weekly' } : null;
-  });
+  const [slot, setSlot] = useState<LessonSlot | null>(null);
+  const [slotLoading, setSlotLoading] = useState(true);
 
+  useEffect(() => {
+    let cancelled = false;
+    getLessonSlot(slotId).then(s => {
+      if (!cancelled) {
+        setSlot(s ? { ...s, recurrenceType: s.recurrenceType ?? 'weekly' } : null);
+        setSlotLoading(false);
+      }
+    });
+    return () => { cancelled = true; };
+  }, [slotId, getLessonSlot]);
+
+  if (slotsLoading || coachesLoading || courtsLoading || slotLoading) return <LoadingSpinner />;
   if (!slot) return <LoadingSpinner />;
 
   const recurrenceType = slot.recurrenceType ?? 'weekly';
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateLessonSlot(slotId, {
-      ...slot,
-      isRecurring: recurrenceType !== 'none',
-      specificDate: recurrenceType === 'none' ? slot.specificDate : null,
-      monthlyWeekNumber: recurrenceType === 'monthly' ? slot.monthlyWeekNumber : null,
-    });
-    toast.success('レッスンを更新しました');
-    router.push('/admin/lessons');
+    try {
+      await updateLessonSlot(slotId, {
+        ...slot,
+        isRecurring: recurrenceType !== 'none',
+        specificDate: recurrenceType === 'none' ? slot.specificDate : null,
+        monthlyWeekNumber: recurrenceType === 'monthly' ? slot.monthlyWeekNumber : null,
+      });
+      toast.success('レッスンを更新しました');
+      router.push('/admin/lessons');
+    } catch {
+      toast.error('レッスンの更新に失敗しました');
+    }
   };
 
   return (

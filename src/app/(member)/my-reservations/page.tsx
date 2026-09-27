@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import useAuth from '@/hooks/useAuth';
 import useReservations from '@/hooks/useReservations';
@@ -11,21 +11,25 @@ import Tabs from '@/components/ui/Tabs';
 import Badge from '@/components/ui/Badge';
 import { LevelBadge } from '@/components/ui/Badge';
 import EmptyState from '@/components/ui/EmptyState';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { RESERVATION_STATUS_LABELS } from '@/lib/constants';
 import { formatDate, toISODateString } from '@/lib/utils';
+import { ReservationWithDetails } from '@/types';
 
 export default function MyReservationsPage() {
   const { user } = useAuth();
   const router = useRouter();
-  const { getMemberReservations, cancelReservation } = useReservations();
+  const { getMemberReservations, cancelReservation, loading } = useReservations();
   const toast = useToast();
   const [tab, setTab] = useState('upcoming');
   const [cancelTarget, setCancelTarget] = useState<string | null>(null);
+  const [reservations, setReservations] = useState<ReservationWithDetails[]>([]);
 
-  const reservations = useMemo(() => {
-    if (!user?.memberId) return [];
-    return getMemberReservations(user.memberId);
+  useEffect(() => {
+    if (user?.memberId) {
+      getMemberReservations(user.memberId).then(r => setReservations(r));
+    }
   }, [user, getMemberReservations]);
 
   const today = toISODateString(new Date());
@@ -65,13 +69,24 @@ export default function MyReservationsPage() {
   );
   const display = tab === 'upcoming' ? upcoming : past;
 
-  const handleCancel = () => {
+  const handleCancel = async () => {
     if (cancelTarget) {
-      cancelReservation(cancelTarget);
-      toast.success('予約をキャンセルしました');
-      setCancelTarget(null);
+      try {
+        await cancelReservation(cancelTarget);
+        toast.success('予約をキャンセルしました');
+        setCancelTarget(null);
+        // Refresh reservations after cancellation
+        if (user?.memberId) {
+          const updated = await getMemberReservations(user.memberId);
+          setReservations(updated);
+        }
+      } catch (err: unknown) {
+        toast.error(err instanceof Error ? err.message : '予約のキャンセルに失敗しました');
+      }
     }
   };
+
+  if (loading) return <LoadingSpinner />;
 
   return (
     <div className="space-y-4">

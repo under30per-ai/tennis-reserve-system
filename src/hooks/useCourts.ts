@@ -1,34 +1,61 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Court } from '@/types';
-import { courtUseCases } from '@/application/usecases';
+import {
+  getCourts as fetchCourts,
+  getCourtById,
+  createCourt,
+  updateCourt as updateCourtAction,
+  deleteCourt as deleteCourtAction,
+} from '@/app/actions/courts';
 
 export default function useCourts() {
-  const [courts, setCourts] = useState<Court[]>(() => courtUseCases.getAll());
+  const [courts, setCourts] = useState<Court[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const refresh = useCallback(() => {
-    setCourts(courtUseCases.getAll());
+  const refresh = useCallback(async () => {
+    const data = await fetchCourts();
+    setCourts(data);
+    setLoading(false);
   }, []);
 
-  const getCourt = useCallback((id: string) => courtUseCases.getById(id), []);
+  useEffect(() => {
+    fetchCourts().then(data => {
+      setCourts(data);
+      setLoading(false);
+    });
+  }, []);
 
-  const addCourt = useCallback((data: Omit<Court, 'id'>) => {
-    const court = courtUseCases.create(data);
-    refresh();
-    return court;
-  }, [refresh]);
+  const getCourt = useCallback(async (id: string) => {
+    return getCourtById(id);
+  }, []);
 
-  const updateCourt = useCallback((id: string, data: Partial<Court>) => {
-    const result = courtUseCases.update(id, data);
-    refresh();
-    return result;
-  }, [refresh]);
+  const addCourt = useCallback(
+    async (data: Omit<Court, 'id'>) => {
+      const court = await createCourt(data);
+      await refresh();
+      return court;
+    },
+    [refresh]
+  );
 
-  const deleteCourt = useCallback((id: string) => {
-    courtUseCases.remove(id);
-    refresh();
-  }, [refresh]);
+  const updateCourt = useCallback(
+    async (id: string, data: Partial<Court>) => {
+      const result = await updateCourtAction(id, data);
+      await refresh();
+      return result;
+    },
+    [refresh]
+  );
 
-  return { courts, getCourt, addCourt, updateCourt, deleteCourt, refresh };
+  const deleteCourt = useCallback(
+    async (id: string) => {
+      await deleteCourtAction(id);
+      await refresh();
+    },
+    [refresh]
+  );
+
+  return { courts, loading, getCourt, addCourt, updateCourt, deleteCourt, refresh };
 }

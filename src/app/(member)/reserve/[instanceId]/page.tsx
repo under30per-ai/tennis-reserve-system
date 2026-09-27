@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import useAuth from '@/hooks/useAuth';
 import useLessonInstances from '@/hooks/useLessonInstances';
@@ -14,6 +15,7 @@ import NetDivider from '@/components/tennis/NetDivider';
 import TennisBallIcon from '@/components/tennis/TennisBallIcon';
 import { formatDate, getAvailabilityLabel } from '@/lib/utils';
 import { DAY_LABELS } from '@/lib/constants';
+import { LessonInstanceWithDetails, Member } from '@/types';
 
 export default function ReserveConfirmPage() {
   const params = useParams();
@@ -23,31 +25,41 @@ export default function ReserveConfirmPage() {
   const isTransferMode = !!fromInstanceId;
   const router = useRouter();
   const { user } = useAuth();
-  const { getInstanceWithDetails } = useLessonInstances();
-  const { makeReservation, transferReservation } = useReservations();
-  const { getMember } = useMembers();
+  const { getInstanceWithDetails, loading: instancesLoading } = useLessonInstances();
+  const { makeReservation, transferReservation, loading: reservationsLoading } = useReservations();
+  const { getMember, loading: membersLoading } = useMembers();
   const toast = useToast();
 
-  const member = user?.memberId ? getMember(user.memberId) : null;
+  const [member, setMember] = useState<Member | null>(null);
+  const [instance, setInstance] = useState<LessonInstanceWithDetails | null>(null);
+
+  useEffect(() => {
+    if (user?.memberId) {
+      getMember(user.memberId).then(m => setMember(m));
+    }
+  }, [user, getMember]);
+
+  useEffect(() => {
+    getInstanceWithDetails(instanceId).then(inst => setInstance(inst));
+  }, [instanceId, getInstanceWithDetails]);
+
   const transferDisabled = isTransferMode && (!member || member.remainingTransfers <= 0);
 
-  const instance = getInstanceWithDetails(instanceId);
-
-  if (!instance) return <LoadingSpinner />;
+  if (instancesLoading || membersLoading || reservationsLoading || !instance) return <LoadingSpinner />;
 
   const avail = getAvailabilityLabel(instance.availableSpots, instance.maxCapacity);
   const isFull = instance.availableSpots <= 0;
   const dayOfWeek = new Date(instance.date).getDay();
 
-  const handleReserve = () => {
+  const handleReserve = async () => {
     if (!user?.memberId) return;
     try {
       if (isTransferMode) {
-        transferReservation(user.memberId, fromInstanceId, instanceId);
+        await transferReservation(user.memberId, fromInstanceId, instanceId);
         toast.success('振替が完了しました');
         router.push('/transfer');
       } else {
-        const res = makeReservation(user.memberId, instanceId);
+        const res = await makeReservation(user.memberId, instanceId);
         if (res.status === 'waitlisted') {
           toast.warning('キャンセル待ちとして登録されました');
         } else {

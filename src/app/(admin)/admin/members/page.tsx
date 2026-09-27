@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import useMembers from '@/hooks/useMembers';
 import useLessonRecords from '@/hooks/useLessonRecords';
@@ -13,16 +13,34 @@ import { LevelBadge } from '@/components/ui/Badge';
 import Badge from '@/components/ui/Badge';
 import EmptyState from '@/components/ui/EmptyState';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { MEMBERSHIP_LABELS } from '@/lib/constants';
 import { formatDate, getInitials } from '@/lib/utils';
 
 export default function MembersPage() {
-  const { members, deleteMember } = useMembers();
-  const { getMemberLessonHistory } = useLessonRecords();
+  const { members, loading: membersLoading, deleteMember } = useMembers();
+  const { getMemberLessonHistory, loading: recordsLoading } = useLessonRecords();
   const toast = useToast();
   const router = useRouter();
   const [search, setSearch] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [lessonCounts, setLessonCounts] = useState<Record<string, number>>({});
+
+  // Fetch lesson counts for all members
+  useEffect(() => {
+    if (members.length === 0) return;
+    const fetchCounts = async () => {
+      const counts: Record<string, number> = {};
+      await Promise.all(
+        members.map(async (member) => {
+          const history = await getMemberLessonHistory(member.id);
+          counts[member.id] = history.length;
+        })
+      );
+      setLessonCounts(counts);
+    };
+    fetchCounts();
+  }, [members, getMemberLessonHistory]);
 
   const filtered = useMemo(() => {
     if (!search) return members;
@@ -30,13 +48,20 @@ export default function MembersPage() {
     return members.filter(m => m.name.includes(q) || m.nameKana.includes(q) || m.email.includes(q));
   }, [members, search]);
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (deleteTarget) {
-      deleteMember(deleteTarget);
-      toast.success('会員を削除しました');
-      setDeleteTarget(null);
+      try {
+        await deleteMember(deleteTarget);
+        toast.success('会員を削除しました');
+      } catch {
+        toast.error('会員の削除に失敗しました');
+      } finally {
+        setDeleteTarget(null);
+      }
     }
   };
+
+  if (membersLoading || recordsLoading) return <LoadingSpinner />;
 
   return (
     <div className="space-y-4">
@@ -89,7 +114,8 @@ export default function MembersPage() {
                     </TableCell>
                     <TableCell>
                       {(() => {
-                        const count = getMemberLessonHistory(member.id).length;
+                        const count = lessonCounts[member.id];
+                        if (count === undefined) return <span className="text-sm text-gray-400">...</span>;
                         return count > 0 ? (
                           <Badge variant="info">{count}件</Badge>
                         ) : (

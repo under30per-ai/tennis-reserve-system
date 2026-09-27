@@ -1,22 +1,43 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { format, addWeeks, subWeeks, isToday } from 'date-fns';
 import useLessonInstances from '@/hooks/useLessonInstances';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import { LevelBadge } from '@/components/ui/Badge';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { getWeekDays, formatWeekRange } from '@/lib/calendar-utils';
 import { DAY_LABELS } from '@/lib/constants';
 import { toISODateString, getAvailabilityLabel } from '@/lib/utils';
+import { LessonInstanceWithDetails } from '@/types';
 
 export default function ReservePage() {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const { getInstancesWithDetailsForDate } = useLessonInstances();
+  const { getInstancesWithDetailsForDate, loading } = useLessonInstances();
   const router = useRouter();
 
   const weekDays = useMemo(() => getWeekDays(currentDate), [currentDate]);
+
+  const [instancesByDate, setInstancesByDate] = useState<Record<string, LessonInstanceWithDetails[]>>({});
+
+  useEffect(() => {
+    const dateStrings = weekDays.map(day => toISODateString(day));
+    Promise.all(
+      dateStrings.map(dateStr =>
+        getInstancesWithDetailsForDate(dateStr).then(instances => ({ dateStr, instances }))
+      )
+    ).then(results => {
+      const map: Record<string, LessonInstanceWithDetails[]> = {};
+      for (const { dateStr, instances } of results) {
+        map[dateStr] = instances;
+      }
+      setInstancesByDate(map);
+    });
+  }, [weekDays, getInstancesWithDetailsForDate]);
+
+  if (loading) return <LoadingSpinner />;
 
   return (
     <div className="space-y-4">
@@ -29,7 +50,7 @@ export default function ReservePage() {
       <div className="space-y-4">
         {weekDays.map(day => {
           const dateStr = toISODateString(day);
-          const instances = getInstancesWithDetailsForDate(dateStr);
+          const instances = instancesByDate[dateStr] ?? [];
           const today = isToday(day);
           return (
             <div key={dateStr}>

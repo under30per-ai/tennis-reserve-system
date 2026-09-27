@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import useReservations from '@/hooks/useReservations';
 import useToast from '@/hooks/useToast';
 import Card from '@/components/ui/Card';
@@ -12,18 +12,26 @@ import { LevelBadge } from '@/components/ui/Badge';
 import Badge from '@/components/ui/Badge';
 import EmptyState from '@/components/ui/EmptyState';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { RESERVATION_STATUS_LABELS } from '@/lib/constants';
 import { formatDate } from '@/lib/utils';
 import { ReservationStatus } from '@/types';
 
 export default function ReservationsPage() {
-  const { getAllWithDetails, cancelReservation } = useReservations();
+  const { getAllWithDetails, cancelReservation, loading } = useReservations();
   const toast = useToast();
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
   const [cancelTarget, setCancelTarget] = useState<string | null>(null);
+  const [allReservations, setAllReservations] = useState<Awaited<ReturnType<typeof getAllWithDetails>>>([]);
 
-  const allReservations = getAllWithDetails();
+  useEffect(() => {
+    let cancelled = false;
+    getAllWithDetails().then(data => {
+      if (!cancelled) setAllReservations(data);
+    });
+    return () => { cancelled = true; };
+  }, [getAllWithDetails]);
 
   const filtered = useMemo(() => {
     let result = allReservations;
@@ -35,11 +43,15 @@ export default function ReservationsPage() {
     return result;
   }, [allReservations, statusFilter, search]);
 
-  const handleCancel = () => {
+  const handleCancel = async () => {
     if (cancelTarget) {
-      cancelReservation(cancelTarget);
-      toast.success('予約をキャンセルしました');
-      setCancelTarget(null);
+      try {
+        await cancelReservation(cancelTarget);
+        toast.success('予約をキャンセルしました');
+        setCancelTarget(null);
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : 'キャンセルに失敗しました');
+      }
     }
   };
 
@@ -51,6 +63,8 @@ export default function ReservationsPage() {
       default: return 'info';
     }
   };
+
+  if (loading) return <LoadingSpinner />;
 
   return (
     <div className="space-y-4">

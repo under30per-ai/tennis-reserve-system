@@ -4,18 +4,12 @@ import './globals.css';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ToastProvider } from '@/contexts/ToastContext';
 import ToastContainer from '@/components/ui/ToastContainer';
-import { useEffect } from 'react';
-import { seedDataIfNeeded } from '@/lib/seed-data';
 
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  useEffect(() => {
-    seedDataIfNeeded();
-  }, []);
-
   return (
     <html lang="ja" className="h-full antialiased">
       <head>

@@ -16,20 +16,28 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
   const router = useRouter();
   const { login } = useAuth();
   const toast = useToast();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSubmitting(true);
 
-    const success = login(email, password, activeTab);
-    if (success) {
-      toast.success('ログインしました');
-      router.push(activeTab === 'admin' ? '/admin' : '/dashboard');
-    } else {
-      setError('メールアドレスまたはパスワードが正しくありません');
+    try {
+      const success = await login(email, password, activeTab);
+      if (success) {
+        toast.success('ログインしました');
+        router.push(activeTab === 'admin' ? '/admin' : '/dashboard');
+      } else {
+        setError('メールアドレスまたはパスワードが正しくありません');
+      }
+    } catch {
+      setError('ログイン中にエラーが発生しました');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -89,8 +97,8 @@ export default function LoginPage() {
               </div>
             )}
 
-            <Button type="submit" className="w-full">
-              ログイン
+            <Button type="submit" className="w-full" disabled={submitting}>
+              {submitting ? 'ログイン中...' : 'ログイン'}
             </Button>
 
             <NetDivider className="!my-4" />

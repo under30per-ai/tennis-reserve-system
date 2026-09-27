@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { format, parseISO } from 'date-fns';
 import { ja } from 'date-fns/locale';
@@ -24,32 +24,43 @@ import {
   ATTENDANCE_STATUS_LABELS,
   ATTENDANCE_STATUS_COLORS,
 } from '@/lib/constants';
-import { Member, LessonLevel, MembershipType } from '@/types';
+import { Member, LessonLevel, MembershipType, MemberLessonHistoryEntry } from '@/types';
 import clsx from 'clsx';
 
 type Tab = 'profile' | 'history' | 'analysis';
 
 export default function MemberDetailPage() {
-  const { getMember, updateMember } = useMembers();
-  const { getMemberLessonHistory } = useLessonRecords();
+  const { getMember, updateMember, loading: membersLoading } = useMembers();
+  const { getMemberLessonHistory, loading: recordsLoading } = useLessonRecords();
   const { summary, isGenerating, generateKarte } = useMemberKarte();
   const toast = useToast();
   const router = useRouter();
   const params = useParams();
   const memberId = params.memberId as string;
 
-  const [member, setMember] = useState<Member | null>(() => getMember(memberId));
+  const [member, setMember] = useState<Member | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('profile');
+  const [history, setHistory] = useState<MemberLessonHistoryEntry[]>([]);
 
-  const history = useMemo(() => getMemberLessonHistory(memberId), [memberId, getMemberLessonHistory]);
+  useEffect(() => {
+    getMember(memberId).then(m => setMember(m ?? null));
+  }, [memberId, getMember]);
 
-  if (!member) return <LoadingSpinner />;
+  useEffect(() => {
+    getMemberLessonHistory(memberId).then(h => setHistory(h));
+  }, [memberId, getMemberLessonHistory]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  if (membersLoading || recordsLoading || !member) return <LoadingSpinner />;
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateMember(memberId, member);
-    toast.success('会員情報を更新しました');
-    router.push('/admin/members');
+    try {
+      await updateMember(memberId, member);
+      toast.success('会員情報を更新しました');
+      router.push('/admin/members');
+    } catch {
+      toast.error('会員情報の更新に失敗しました');
+    }
   };
 
   const handleGenerate = () => {

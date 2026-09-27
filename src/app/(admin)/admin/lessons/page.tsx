@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import useLessonSlots from '@/hooks/useLessonSlots';
 import useCoaches from '@/hooks/useCoaches';
@@ -10,19 +11,43 @@ import Button from '@/components/ui/Button';
 import { Table, TableHeader, TableRow, TableHead, TableCell } from '@/components/ui/Table';
 import { LevelBadge } from '@/components/ui/Badge';
 import EmptyState from '@/components/ui/EmptyState';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { DAY_LABELS } from '@/lib/constants';
+import { Coach, Court } from '@/types';
 
 export default function LessonsPage() {
-  const { lessonSlots, deleteLessonSlot } = useLessonSlots();
-  const { getCoach } = useCoaches();
-  const { getCourt } = useCourts();
+  const { lessonSlots, loading: slotsLoading, deleteLessonSlot } = useLessonSlots();
+  const { getCoach, loading: coachesLoading } = useCoaches();
+  const { getCourt, loading: courtsLoading } = useCourts();
   const toast = useToast();
   const router = useRouter();
 
-  const handleDelete = (id: string) => {
-    deleteLessonSlot(id);
-    toast.success('レッスンを削除しました');
+  const [coachMap, setCoachMap] = useState<Record<string, Coach | null>>({});
+  const [courtMap, setCourtMap] = useState<Record<string, Court | null>>({});
+
+  useEffect(() => {
+    const coachIds = [...new Set(lessonSlots.map(s => s.coachId))];
+    const courtIds = [...new Set(lessonSlots.map(s => s.courtId))];
+
+    Promise.all(coachIds.map(async id => [id, await getCoach(id)] as const)).then(entries => {
+      setCoachMap(Object.fromEntries(entries));
+    });
+
+    Promise.all(courtIds.map(async id => [id, await getCourt(id)] as const)).then(entries => {
+      setCourtMap(Object.fromEntries(entries));
+    });
+  }, [lessonSlots, getCoach, getCourt]);
+
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteLessonSlot(id);
+      toast.success('レッスンを削除しました');
+    } catch {
+      toast.error('レッスンの削除に失敗しました');
+    }
   };
+
+  if (slotsLoading || coachesLoading || courtsLoading) return <LoadingSpinner />;
 
   return (
     <div className="space-y-4">
@@ -53,8 +78,8 @@ export default function LessonsPage() {
               </TableHeader>
               <tbody>
                 {lessonSlots.map(slot => {
-                  const coach = getCoach(slot.coachId);
-                  const court = getCourt(slot.courtId);
+                  const coach = coachMap[slot.coachId];
+                  const court = courtMap[slot.courtId];
                   return (
                     <TableRow key={slot.id} onClick={() => router.push(`/admin/lessons/${slot.id}`)}>
                       <TableCell><span className="font-medium">{slot.title}</span></TableCell>
@@ -77,8 +102,8 @@ export default function LessonsPage() {
           {/* Mobile: card list */}
           <div className="sm:hidden space-y-3">
             {lessonSlots.map(slot => {
-              const coach = getCoach(slot.coachId);
-              const court = getCourt(slot.courtId);
+              const coach = coachMap[slot.coachId];
+              const court = courtMap[slot.courtId];
               return (
                 <Card
                   key={slot.id}

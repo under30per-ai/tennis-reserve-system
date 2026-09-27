@@ -9,21 +9,28 @@ import Button from '@/components/ui/Button';
 import { LevelBadge } from '@/components/ui/Badge';
 import EmptyState from '@/components/ui/EmptyState';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { getInitials } from '@/lib/utils';
 
 export default function CoachesPage() {
-  const { coaches, deleteCoach } = useCoaches();
+  const { coaches, loading, deleteCoach } = useCoaches();
   const toast = useToast();
   const router = useRouter();
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (deleteTarget) {
-      deleteCoach(deleteTarget);
-      toast.success('コーチを削除しました');
+      try {
+        await deleteCoach(deleteTarget);
+        toast.success('コーチを削除しました');
+      } catch {
+        toast.error('コーチの削除に失敗しました');
+      }
       setDeleteTarget(null);
     }
   };
+
+  if (loading) return <LoadingSpinner />;
 
   return (
     <div className="space-y-4">

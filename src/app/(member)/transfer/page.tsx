@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { format, addWeeks, subWeeks, isToday } from 'date-fns';
 import useAuth from '@/hooks/useAuth';
@@ -13,41 +13,59 @@ import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import { LevelBadge } from '@/components/ui/Badge';
 import EmptyState from '@/components/ui/EmptyState';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import NetDivider from '@/components/tennis/NetDivider';
 import { getWeekDays, formatWeekRange } from '@/lib/calendar-utils';
 import { DAY_LABELS } from '@/lib/constants';
 import { formatDate, toISODateString, getAvailabilityLabel } from '@/lib/utils';
-import { ReservationWithDetails } from '@/types';
+import { ReservationWithDetails, Member, LessonInstanceWithDetails } from '@/types';
 
 export default function TransferPage() {
   const router = useRouter();
   const { user } = useAuth();
-  const { getMemberReservations } = useReservations();
-  const { getInstanceWithDetails, instances } = useLessonInstances();
-  const { getMember } = useMembers();
+  const { getMemberReservations, loading: reservationsLoading } = useReservations();
+  const { getInstanceWithDetails, instances, loading: instancesLoading } = useLessonInstances();
+  const { getMember, loading: membersLoading } = useMembers();
   const { lessonSlots: slots } = useLessonSlots();
 
   const [selectedFrom, setSelectedFrom] = useState<string | null>(null);
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [member, setMember] = useState<Member | null>(null);
+  const [reservations, setReservations] = useState<ReservationWithDetails[]>([]);
+  const [completedTransferData, setCompletedTransferData] = useState<{ reservation: ReservationWithDetails; fromInstance: LessonInstanceWithDetails | null }[]>([]);
+  const [availableTargets, setAvailableTargets] = useState<(LessonInstanceWithDetails | null)[]>([]);
 
   const weekDays = useMemo(() => getWeekDays(currentDate), [currentDate]);
 
-  const member = user?.memberId ? getMember(user.memberId) : null;
+  useEffect(() => {
+    if (user?.memberId) {
+      getMember(user.memberId).then(m => setMember(m));
+    }
+  }, [user, getMember]);
 
-  const reservations = useMemo(() => {
-    if (!user?.memberId) return [];
-    return getMemberReservations(user.memberId);
+  useEffect(() => {
+    if (user?.memberId) {
+      getMemberReservations(user.memberId).then(r => setReservations(r));
+    }
   }, [user, getMemberReservations]);
 
   // Completed transfers: confirmed reservations that have a transferFromInstanceId
-  const completedTransfers = useMemo(() => {
-    return reservations
-      .filter(r => r.status === 'confirmed' && r.transferFromInstanceId)
-      .map(r => {
-        const fromInstance = getInstanceWithDetails(r.transferFromInstanceId!);
-        return { reservation: r, fromInstance };
-      });
-  }, [reservations, getInstanceWithDetails]);
+  const completedTransferReservations = useMemo(() => {
+    return reservations.filter(r => r.status === 'confirmed' && r.transferFromInstanceId);
+  }, [reservations]);
+
+  // Resolve fromInstance details asynchronously
+  useEffect(() => {
+    if (completedTransferReservations.length === 0) return;
+    Promise.all(
+      completedTransferReservations.map(r =>
+        getInstanceWithDetails(r.transferFromInstanceId!).then(fromInstance => ({
+          reservation: r,
+          fromInstance,
+        }))
+      )
+    ).then(setCompletedTransferData);
+  }, [completedTransferReservations, getInstanceWithDetails]);
 
   // Eligible for transfer: cancelled by member OR confirmed/waitlisted on a cancelled lesson
   const transferEligible = useMemo(() => {
@@ -66,29 +84,37 @@ export default function TransferPage() {
     );
   }, [reservations]);
 
-  const availableTargets = useMemo(() => {
-    if (!selectedFrom) return [];
-    const fromRes = transferEligible.find(r => r.id === selectedFrom);
-    if (!fromRes) return [];
-    const fromSlot = slots.find(s => s.id === fromRes.lessonInstance.lessonSlotId);
-    if (!fromSlot) return [];
+  // Resolve available targets asynchronously
+  useEffect(() => {
+    if (!selectedFrom) return;
+    const fromResItem = transferEligible.find(r => r.id === selectedFrom);
+    if (!fromResItem) return;
+    const fromSlot = slots.find(s => s.id === fromResItem.lessonInstance.lessonSlotId);
+    if (!fromSlot) return;
 
     const today = toISODateString(new Date());
-    // Check which instances member already has a reservation for (include cancelled to prevent re-booking)
     const memberInstanceIds = new Set(
       reservations
         .filter(r => r.status === 'confirmed' || r.status === 'waitlisted' || r.status === 'cancelled')
         .map(r => r.lessonInstanceId)
     );
 
-    return instances
-      .filter(i => i.date > today && !i.isCancelled && !memberInstanceIds.has(i.id))
-      .map(i => getInstanceWithDetails(i.id))
-      .filter(i => i !== null && i.lessonSlot.level === fromSlot.level && i.availableSpots > 0)
-      .sort((a, b) => a!.date.localeCompare(b!.date));
+    const candidateInstances = instances
+      .filter(i => i.date > today && !i.isCancelled && !memberInstanceIds.has(i.id));
+
+    Promise.all(
+      candidateInstances.map(i => getInstanceWithDetails(i.id))
+    ).then(resolved => {
+      const filtered = resolved
+        .filter(i => i !== null && i.lessonSlot.level === fromSlot.level && i.availableSpots > 0)
+        .sort((a, b) => a!.date.localeCompare(b!.date));
+      setAvailableTargets(filtered);
+    });
   }, [selectedFrom, transferEligible, reservations, instances, getInstanceWithDetails, slots]);
 
   const fromRes = transferEligible.find(r => r.id === selectedFrom);
+
+  if (reservationsLoading || instancesLoading || membersLoading) return <LoadingSpinner />;
 
   return (
     <div className="space-y-6">
@@ -103,12 +129,12 @@ export default function TransferPage() {
         </div>
       )}
 
-      {completedTransfers.length > 0 && (
+      {completedTransferData.length > 0 && (
         <Card>
           <CardTitle>振替済みの予約</CardTitle>
           <NetDivider className="!my-3" />
           <div className="space-y-2">
-            {completedTransfers.map(({ reservation: res, fromInstance }) => (
+            {completedTransferData.map(({ reservation: res, fromInstance }) => (
               <div key={res.id} className="p-3 rounded-lg border border-gray-200 bg-gray-50">
                 <div className="flex items-center gap-2 mb-2">
                   <Badge variant="info">振替済</Badge>
@@ -149,7 +175,7 @@ export default function TransferPage() {
           <div className="space-y-2">
             {transferEligible.map(res => (
               <div key={res.id} className={`p-3 rounded-lg border cursor-pointer transition-colors ${selectedFrom === res.id ? 'border-court-green bg-court-light' : 'border-gray-200 hover:border-court-grass'}`}
-                onClick={() => { setSelectedFrom(selectedFrom === res.id ? null : res.id); setCurrentDate(new Date()); }}>
+                onClick={() => { setSelectedFrom(selectedFrom === res.id ? null : res.id); setCurrentDate(new Date()); setAvailableTargets([]); }}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="min-w-14 text-center">

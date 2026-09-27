@@ -10,13 +10,14 @@ import Card, { CardTitle } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { LEVEL_LABELS, DAY_LABELS, RECURRENCE_TYPE_LABELS } from '@/lib/constants';
 import { LessonLevel, DayOfWeek, RecurrenceType } from '@/types';
 
 export default function NewLessonPage() {
-  const { addLessonSlot } = useLessonSlots();
-  const { coaches } = useCoaches();
-  const { courts } = useCourts();
+  const { addLessonSlot, loading: slotsLoading } = useLessonSlots();
+  const { coaches, loading: coachesLoading } = useCoaches();
+  const { courts, loading: courtsLoading } = useCourts();
   const toast = useToast();
   const router = useRouter();
 
@@ -29,24 +30,30 @@ export default function NewLessonPage() {
     monthlyWeekNumber: 1,
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    addLessonSlot({
-      ...form,
-      isRecurring: form.recurrenceType !== 'none',
-      specificDate: form.recurrenceType === 'none' ? form.specificDate : null,
-      recurrenceStartDate: form.recurrenceType === 'biweekly'
-        ? form.recurrenceStartDate
-        : form.recurrenceType === 'none' && form.specificDate
-          ? form.specificDate
-          : new Date().toISOString().split('T')[0],
-      recurrenceEndDate: null,
-      monthlyWeekNumber: form.recurrenceType === 'monthly' ? form.monthlyWeekNumber : null,
-      isActive: true,
-    });
-    toast.success('レッスンを追加しました');
-    router.push('/admin/lessons');
+    try {
+      await addLessonSlot({
+        ...form,
+        isRecurring: form.recurrenceType !== 'none',
+        specificDate: form.recurrenceType === 'none' ? form.specificDate : null,
+        recurrenceStartDate: form.recurrenceType === 'biweekly'
+          ? form.recurrenceStartDate
+          : form.recurrenceType === 'none' && form.specificDate
+            ? form.specificDate
+            : new Date().toISOString().split('T')[0],
+        recurrenceEndDate: null,
+        monthlyWeekNumber: form.recurrenceType === 'monthly' ? form.monthlyWeekNumber : null,
+        isActive: true,
+      });
+      toast.success('レッスンを追加しました');
+      router.push('/admin/lessons');
+    } catch {
+      toast.error('レッスンの追加に失敗しました');
+    }
   };
+
+  if (slotsLoading || coachesLoading || courtsLoading) return <LoadingSpinner />;
 
   return (
     <div className="max-w-2xl">

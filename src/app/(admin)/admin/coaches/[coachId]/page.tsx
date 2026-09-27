@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import useCoaches from '@/hooks/useCoaches';
 import useToast from '@/hooks/useToast';
@@ -12,25 +12,33 @@ import { LEVEL_LABELS } from '@/lib/constants';
 import { Coach, LessonLevel } from '@/types';
 
 export default function EditCoachPage() {
-  const { getCoach, updateCoach } = useCoaches();
+  const { getCoach, updateCoach, loading } = useCoaches();
   const toast = useToast();
   const router = useRouter();
   const params = useParams();
   const coachId = params.coachId as string;
 
-  const [coach, setCoach] = useState<Coach | null>(() => getCoach(coachId));
+  const [coach, setCoach] = useState<Coach | null>(null);
 
-  if (!coach) return <LoadingSpinner />;
+  useEffect(() => {
+    getCoach(coachId).then(c => setCoach(c));
+  }, [coachId, getCoach]);
+
+  if (loading || !coach) return <LoadingSpinner />;
 
   const toggleSpecialty = (level: LessonLevel) => {
     setCoach(c => c ? { ...c, specialties: c.specialties.includes(level) ? c.specialties.filter(s => s !== level) : [...c.specialties, level] } : c);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateCoach(coachId, coach);
-    toast.success('コーチ情報を更新しました');
-    router.push('/admin/coaches');
+    try {
+      await updateCoach(coachId, coach);
+      toast.success('コーチ情報を更新しました');
+      router.push('/admin/coaches');
+    } catch {
+      toast.error('コーチ情報の更新に失敗しました');
+    }
   };
 
   return (

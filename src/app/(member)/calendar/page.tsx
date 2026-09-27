@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { format, addWeeks, subWeeks, addMonths, subMonths, isSameMonth, isToday } from 'date-fns';
 import useLessonInstances from '@/hooks/useLessonInstances';
@@ -8,18 +8,44 @@ import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Tabs from '@/components/ui/Tabs';
 import { LevelBadge } from '@/components/ui/Badge';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { getWeekDays, getCalendarMonthDays, formatWeekRange } from '@/lib/calendar-utils';
 import { DAY_LABELS, LEVEL_COLORS } from '@/lib/constants';
 import { toISODateString, getAvailabilityLabel } from '@/lib/utils';
+import { LessonInstanceWithDetails } from '@/types';
 
 export default function CalendarPage() {
   const [view, setView] = useState<'weekly' | 'monthly'>('weekly');
   const [currentDate, setCurrentDate] = useState(new Date());
-  const { getInstancesWithDetailsForDate } = useLessonInstances();
+  const { getInstancesWithDetailsForDate, loading } = useLessonInstances();
   const router = useRouter();
 
   const weekDays = useMemo(() => getWeekDays(currentDate), [currentDate]);
   const monthDays = useMemo(() => getCalendarMonthDays(currentDate), [currentDate]);
+
+  // Determine which days to fetch based on the view
+  const daysToFetch = useMemo(() => {
+    return view === 'weekly' ? weekDays : monthDays;
+  }, [view, weekDays, monthDays]);
+
+  const [instancesByDate, setInstancesByDate] = useState<Record<string, LessonInstanceWithDetails[]>>({});
+
+  useEffect(() => {
+    const dateStrings = daysToFetch.map(day => toISODateString(day));
+    Promise.all(
+      dateStrings.map(dateStr =>
+        getInstancesWithDetailsForDate(dateStr).then(instances => ({ dateStr, instances }))
+      )
+    ).then(results => {
+      const map: Record<string, LessonInstanceWithDetails[]> = {};
+      for (const { dateStr, instances } of results) {
+        map[dateStr] = instances;
+      }
+      setInstancesByDate(map);
+    });
+  }, [daysToFetch, getInstancesWithDetailsForDate]);
+
+  if (loading) return <LoadingSpinner />;
 
   return (
     <div className="space-y-4">
@@ -36,7 +62,7 @@ export default function CalendarPage() {
           <div className="space-y-4">
             {weekDays.map(day => {
               const dateStr = toISODateString(day);
-              const instances = getInstancesWithDetailsForDate(dateStr);
+              const instances = instancesByDate[dateStr] ?? [];
               const today = isToday(day);
               return (
                 <div key={dateStr}>
@@ -100,7 +126,7 @@ export default function CalendarPage() {
             ))}
             {monthDays.map((day, i) => {
               const dateStr = toISODateString(day);
-              const instances = getInstancesWithDetailsForDate(dateStr);
+              const instances = instancesByDate[dateStr] ?? [];
               const inMonth = isSameMonth(day, currentDate);
               const today = isToday(day);
               return (

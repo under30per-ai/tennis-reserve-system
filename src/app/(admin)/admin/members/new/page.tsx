@@ -8,11 +8,12 @@ import Card, { CardTitle } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 import Select from '@/components/ui/Select';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { LEVEL_LABELS, MEMBERSHIP_LABELS } from '@/lib/constants';
 import { LessonLevel, MembershipType } from '@/types';
 
 export default function NewMemberPage() {
-  const { addMember } = useMembers();
+  const { addMember, loading } = useMembers();
   const toast = useToast();
   const router = useRouter();
 
@@ -23,18 +24,24 @@ export default function NewMemberPage() {
     password: 'password',
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    addMember({
-      ...form,
-      joinDate: new Date().toISOString().split('T')[0],
-      isActive: true,
-      notes: '',
-      remainingTransfers: 3,
-    });
-    toast.success('会員を追加しました');
-    router.push('/admin/members');
+    try {
+      await addMember({
+        ...form,
+        joinDate: new Date().toISOString().split('T')[0],
+        isActive: true,
+        notes: '',
+        remainingTransfers: 3,
+      });
+      toast.success('会員を追加しました');
+      router.push('/admin/members');
+    } catch {
+      toast.error('会員の追加に失敗しました');
+    }
   };
+
+  if (loading) return <LoadingSpinner />;
 
   return (
     <div className="max-w-2xl">

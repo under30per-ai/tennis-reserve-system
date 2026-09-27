@@ -7,11 +7,12 @@ import useToast from '@/hooks/useToast';
 import Card, { CardTitle } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { LEVEL_LABELS } from '@/lib/constants';
 import { LessonLevel } from '@/types';
 
 export default function NewCoachPage() {
-  const { addCoach } = useCoaches();
+  const { addCoach, loading } = useCoaches();
   const toast = useToast();
   const router = useRouter();
 
@@ -22,17 +23,23 @@ export default function NewCoachPage() {
     setSpecialties(prev => prev.includes(level) ? prev.filter(s => s !== level) : [...prev, level]);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    addCoach({
-      ...form,
-      specialties,
-      certifications: form.certifications.split(',').map(c => c.trim()).filter(Boolean),
-      isActive: true,
-    });
-    toast.success('コーチを追加しました');
-    router.push('/admin/coaches');
+    try {
+      await addCoach({
+        ...form,
+        specialties,
+        certifications: form.certifications.split(',').map(c => c.trim()).filter(Boolean),
+        isActive: true,
+      });
+      toast.success('コーチを追加しました');
+      router.push('/admin/coaches');
+    } catch {
+      toast.error('コーチの追加に失敗しました');
+    }
   };
+
+  if (loading) return <LoadingSpinner />;
 
   return (
     <div className="max-w-2xl">

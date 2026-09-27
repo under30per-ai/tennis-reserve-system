@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { format, addWeeks, subWeeks } from 'date-fns';
 import useLessonInstances from '@/hooks/useLessonInstances';
 import useReservations from '@/hooks/useReservations';
@@ -13,31 +13,59 @@ import Badge from '@/components/ui/Badge';
 import Select from '@/components/ui/Select';
 import Input from '@/components/ui/Input';
 import Modal from '@/components/ui/Modal';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { getWeekDays, formatWeekRange } from '@/lib/calendar-utils';
 import { DAY_LABELS, LEVEL_LABELS, CANCEL_REASONS, CANCEL_REASON_LABELS } from '@/lib/constants';
 import { toISODateString } from '@/lib/utils';
-import { LessonInstanceWithDetails } from '@/types';
+import { LessonInstanceWithDetails, LessonLevel } from '@/types';
 
 export default function SchedulePage() {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const { getInstancesWithDetailsForDate, cancelInstance } = useLessonInstances();
-  const { getReservationsForInstance } = useReservations();
-  const { getMember } = useMembers();
+  const { getInstancesWithDetailsForDate, cancelInstance, loading } = useLessonInstances();
+  const { getReservationsForInstance, loading: reservationsLoading } = useReservations();
+  const { getMember, loading: membersLoading } = useMembers();
   const toast = useToast();
   const [selectedInstance, setSelectedInstance] = useState<LessonInstanceWithDetails | null>(null);
   const [showCancelForm, setShowCancelForm] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [cancelReasonOther, setCancelReasonOther] = useState('');
 
+  // Store instances per day in state (async loading)
+  const [dayInstances, setDayInstances] = useState<Record<string, LessonInstanceWithDetails[]>>({});
   const weekDays = useMemo(() => getWeekDays(currentDate), [currentDate]);
 
-  const participants = useMemo(() => {
-    if (!selectedInstance) return [];
-    const reservations = getReservationsForInstance(selectedInstance.id);
-    return reservations.map(r => {
-      const member = getMember(r.memberId);
-      return { reservation: r, member };
-    }).filter(p => p.member !== null);
+  useEffect(() => {
+    let cancelled = false;
+    const loadInstances = async () => {
+      const result: Record<string, LessonInstanceWithDetails[]> = {};
+      for (const day of weekDays) {
+        const dateStr = toISODateString(day);
+        result[dateStr] = await getInstancesWithDetailsForDate(dateStr, true);
+      }
+      if (!cancelled) setDayInstances(result);
+    };
+    loadInstances();
+    return () => { cancelled = true; };
+  }, [weekDays, getInstancesWithDetailsForDate]);
+
+  // Store participants in state (async loading)
+  const [participants, setParticipants] = useState<{ reservation: { id: string; memberId: string; status: string }; member: { name: string; avatarColor: string; level: LessonLevel } | null }[]>([]);
+
+  useEffect(() => {
+    if (!selectedInstance) return;
+    let cancelled = false;
+    const loadParticipants = async () => {
+      const reservations = await getReservationsForInstance(selectedInstance.id);
+      const results = await Promise.all(
+        reservations.map(async (r: { id: string; memberId: string; status: string }) => {
+          const member = await getMember(r.memberId);
+          return { reservation: r, member };
+        })
+      );
+      if (!cancelled) setParticipants(results.filter(p => p.member !== null));
+    };
+    loadParticipants();
+    return () => { cancelled = true; };
   }, [selectedInstance, getReservationsForInstance, getMember]);
 
   const openInstance = (inst: LessonInstanceWithDetails) => {
@@ -47,18 +75,25 @@ export default function SchedulePage() {
     setCancelReasonOther('');
   };
 
-  const handleCancel = () => {
+  const handleCancel = async () => {
     if (!selectedInstance || !cancelReason) return;
     const reasonLabel = cancelReason === 'other'
       ? (cancelReasonOther.trim() || 'その他')
       : CANCEL_REASON_LABELS[cancelReason] ?? cancelReason;
-    cancelInstance(selectedInstance.id, reasonLabel);
-    toast.success('レッスンを中止にしました');
-    setSelectedInstance(null);
-    setShowCancelForm(false);
-    setCancelReason('');
-    setCancelReasonOther('');
+    try {
+      await cancelInstance(selectedInstance.id, reasonLabel);
+      toast.success('レッスンを中止にしました');
+      setSelectedInstance(null);
+      setParticipants([]);
+      setShowCancelForm(false);
+      setCancelReason('');
+      setCancelReasonOther('');
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '中止に失敗しました');
+    }
   };
+
+  if (loading || reservationsLoading || membersLoading) return <LoadingSpinner />;
 
   return (
     <div className="space-y-4">
@@ -80,7 +115,7 @@ export default function SchedulePage() {
               </div>
             ))}
             {weekDays.map((day, i) => {
-              const instances = getInstancesWithDetailsForDate(toISODateString(day), true);
+              const instances = dayInstances[toISODateString(day)] ?? [];
               return (
                 <div key={i} className={`bg-white p-1 min-h-32 ${i === 0 ? 'col-start-2' : ''}`}>
                   {instances.length === 0 ? (
@@ -125,7 +160,7 @@ export default function SchedulePage() {
       <div className="sm:hidden space-y-4">
         {weekDays.map((day) => {
           const dateStr = toISODateString(day);
-          const instances = getInstancesWithDetailsForDate(dateStr, true);
+          const instances = dayInstances[dateStr] ?? [];
           const isToday = dateStr === toISODateString(new Date());
           return (
             <div key={dateStr}>
@@ -178,7 +213,7 @@ export default function SchedulePage() {
       {/* Participants modal */}
       <Modal
         isOpen={!!selectedInstance}
-        onClose={() => setSelectedInstance(null)}
+        onClose={() => { setSelectedInstance(null); setParticipants([]); }}
         title="レッスン詳細"
         size="md"
       >

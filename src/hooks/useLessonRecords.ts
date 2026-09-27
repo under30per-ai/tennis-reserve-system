@@ -1,51 +1,90 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import {
   LessonRecord,
   LessonRecordWithDetails,
   MemberLessonHistoryEntry,
   Reservation,
 } from '@/types';
-import { lessonRecordUseCases } from '@/application/usecases';
+import {
+  getLessonRecords as fetchRecords,
+  createLessonRecord,
+  updateLessonRecord as updateRecordAction,
+  getLessonRecordByInstanceId,
+  getLessonRecordWithDetails,
+  getMemberLessonHistory as fetchMemberHistory,
+  getReservationsForInstance as fetchReservationsForInstance,
+} from '@/app/actions/lesson-records';
 
 export default function useLessonRecords() {
-  const [records, setRecords] = useState<LessonRecord[]>(() => lessonRecordUseCases.getAll());
+  const [records, setRecords] = useState<LessonRecord[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const refresh = useCallback(() => {
-    setRecords(lessonRecordUseCases.getAll());
+  const refresh = useCallback(async () => {
+    const data = await fetchRecords();
+    setRecords(data);
+    setLoading(false);
   }, []);
 
-  const getRecordForInstance = useCallback((instanceId: string): LessonRecord | null => {
-    return records.find(r => r.lessonInstanceId === instanceId) ?? null;
-  }, [records]);
-
-  const createRecord = useCallback((data: Omit<LessonRecord, 'id' | 'createdAt' | 'updatedAt'>): LessonRecord => {
-    const record = lessonRecordUseCases.create(data, records);
-    refresh();
-    return record;
-  }, [records, refresh]);
-
-  const updateRecord = useCallback((id: string, data: Partial<LessonRecord>): LessonRecord | null => {
-    const result = lessonRecordUseCases.update(id, data);
-    refresh();
-    return result;
-  }, [refresh]);
-
-  const getRecordWithDetails = useCallback((id: string): LessonRecordWithDetails | null => {
-    return lessonRecordUseCases.getWithDetails(id, records);
-  }, [records]);
-
-  const getMemberLessonHistory = useCallback((memberId: string): MemberLessonHistoryEntry[] => {
-    return lessonRecordUseCases.getMemberHistory(memberId, records);
-  }, [records]);
-
-  const getReservationsForInstance = useCallback((instanceId: string): Reservation[] => {
-    return lessonRecordUseCases.getReservationsForInstance(instanceId);
+  useEffect(() => {
+    fetchRecords().then(data => {
+      setRecords(data);
+      setLoading(false);
+    });
   }, []);
+
+  const getRecordForInstance = useCallback(
+    async (instanceId: string): Promise<LessonRecord | null> => {
+      return getLessonRecordByInstanceId(instanceId);
+    },
+    []
+  );
+
+  const createRecord = useCallback(
+    async (
+      data: Omit<LessonRecord, 'id' | 'createdAt' | 'updatedAt'>
+    ): Promise<LessonRecord> => {
+      const record = await createLessonRecord(data);
+      await refresh();
+      return record;
+    },
+    [refresh]
+  );
+
+  const updateRecord = useCallback(
+    async (id: string, data: Partial<LessonRecord>): Promise<LessonRecord | null> => {
+      const result = await updateRecordAction(id, data);
+      await refresh();
+      return result;
+    },
+    [refresh]
+  );
+
+  const getRecordWithDetails = useCallback(
+    async (id: string): Promise<LessonRecordWithDetails | null> => {
+      return getLessonRecordWithDetails(id);
+    },
+    []
+  );
+
+  const getMemberLessonHistory = useCallback(
+    async (memberId: string): Promise<MemberLessonHistoryEntry[]> => {
+      return fetchMemberHistory(memberId);
+    },
+    []
+  );
+
+  const getReservationsForInstance = useCallback(
+    async (instanceId: string): Promise<Reservation[]> => {
+      return fetchReservationsForInstance(instanceId);
+    },
+    []
+  );
 
   return {
     records,
+    loading,
     getRecordForInstance,
     createRecord,
     updateRecord,

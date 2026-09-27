@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { Member, MemberLessonHistoryEntry, MemberKarteSummary } from '@/types';
-import { memberKarteUseCases } from '@/application/usecases';
+import { generateMockKarteSummary } from '@/lib/karte-generator';
 
 export default function useMemberKarte() {
   const [summary, setSummary] = useState<MemberKarteSummary | null>(null);
@@ -12,7 +12,8 @@ export default function useMemberKarte() {
     setIsGenerating(true);
     setSummary(null);
 
-    const result = await memberKarteUseCases.generate(member, history);
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    const result = generateMockKarteSummary(member, history);
     setSummary(result);
     setIsGenerating(false);
     return result;

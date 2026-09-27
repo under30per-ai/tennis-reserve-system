@@ -7,6 +7,7 @@ import Card, { CardTitle } from '@/components/ui/Card';
 import { LevelBadge } from '@/components/ui/Badge';
 import Badge from '@/components/ui/Badge';
 import EmptyState from '@/components/ui/EmptyState';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import TennisBallIcon from '@/components/tennis/TennisBallIcon';
 import RacketIcon from '@/components/tennis/RacketIcon';
 import NetDivider from '@/components/tennis/NetDivider';
@@ -15,9 +16,14 @@ import { formatDate } from '@/lib/utils';
 
 export default function AdminDashboardPage() {
   const router = useRouter();
-  const stats = useDashboardStats();
+  const { stats, loading } = useDashboardStats();
 
-  const maxTrend = useMemo(() => Math.max(...stats.weeklyTrend.map(t => t.count), 1), [stats.weeklyTrend]);
+  const maxTrend = useMemo(() => {
+    if (!stats) return 1;
+    return Math.max(...stats.weeklyTrend.map(t => t.count), 1);
+  }, [stats]);
+
+  if (loading || !stats) return <LoadingSpinner />;
 
   return (
     <div className="space-y-6">

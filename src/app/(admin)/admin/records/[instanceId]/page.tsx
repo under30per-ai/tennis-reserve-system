@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { format, parseISO } from 'date-fns';
 import { ja } from 'date-fns/locale';
@@ -15,7 +15,8 @@ import Textarea from '@/components/ui/Textarea';
 import Select from '@/components/ui/Select';
 import StarRating from '@/components/ui/StarRating';
 import { LevelBadge } from '@/components/ui/Badge';
-import { MemberLessonNote, AttendanceStatus } from '@/types';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import { LessonInstanceWithDetails, LessonRecord, MemberLessonNote, AttendanceStatus } from '@/types';
 import { DAY_LABELS, ATTENDANCE_STATUS_LABELS } from '@/lib/constants';
 
 interface MemberNoteForm {
@@ -33,59 +34,80 @@ export default function RecordEditPage() {
   const router = useRouter();
   const params = useParams();
   const instanceId = params.instanceId as string;
-  const { getInstanceWithDetails } = useLessonInstances();
-  const { getRecordForInstance, getReservationsForInstance, createRecord, updateRecord } = useLessonRecords();
-  const { getMember } = useMembers();
+  const { getInstanceWithDetails, loading } = useLessonInstances();
+  const { getRecordForInstance, getReservationsForInstance, createRecord, updateRecord, loading: recordsLoading } = useLessonRecords();
+  const { getMember, loading: membersLoading } = useMembers();
   const toast = useToast();
 
-  const instanceDetails = useMemo(() => getInstanceWithDetails(instanceId), [instanceId, getInstanceWithDetails]);
-  const existingRecord = useMemo(() => getRecordForInstance(instanceId), [instanceId, getRecordForInstance]);
+  const [instanceDetails, setInstanceDetails] = useState<LessonInstanceWithDetails | null>(null);
+  const [existingRecord, setExistingRecord] = useState<LessonRecord | null>(null);
+  const [dataLoaded, setDataLoaded] = useState(false);
 
-  const initialFormData = useMemo(() => {
-    if (!instanceDetails) return { theme: '', content: '', memberNotes: [] as MemberNoteForm[] };
-    if (existingRecord) {
-      return {
-        theme: existingRecord.theme,
-        content: existingRecord.content,
-        memberNotes: existingRecord.memberNotes.map(note => {
-          const m = getMember(note.memberId);
-          return {
-            memberId: note.memberId,
-            memberName: m?.name ?? '不明',
-            avatarColor: m?.avatarColor ?? '#888',
-            attendance: note.attendance,
-            performanceRating: note.performanceRating,
-            goodPoints: note.goodPoints,
-            improvementPoints: note.improvementPoints,
-            memo: note.memo,
-          };
-        }),
-      };
-    }
-    const reservations = getReservationsForInstance(instanceId);
-    return {
-      theme: '',
-      content: '',
-      memberNotes: reservations.map(r => {
-        const m = getMember(r.memberId);
-        return {
-          memberId: r.memberId,
-          memberName: m?.name ?? '不明',
-          avatarColor: m?.avatarColor ?? '#888',
-          attendance: 'present' as AttendanceStatus,
-          performanceRating: 3,
-          goodPoints: '',
-          improvementPoints: '',
-          memo: '',
-        };
-      }),
-    };
-  }, [instanceDetails, existingRecord, instanceId, getMember, getReservationsForInstance]);
-
-  const [theme, setTheme] = useState(() => initialFormData.theme);
-  const [content, setContent] = useState(() => initialFormData.content);
-  const [memberNotes, setMemberNotes] = useState<MemberNoteForm[]>(() => initialFormData.memberNotes);
+  const [theme, setTheme] = useState('');
+  const [content, setContent] = useState('');
+  const [memberNotes, setMemberNotes] = useState<MemberNoteForm[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadData = async () => {
+      const details = await getInstanceWithDetails(instanceId);
+      const record = await getRecordForInstance(instanceId);
+
+      if (cancelled) return;
+
+      setInstanceDetails(details);
+      setExistingRecord(record);
+
+      if (!details) {
+        setDataLoaded(true);
+        return;
+      }
+
+      if (record) {
+        setTheme(record.theme);
+        setContent(record.content);
+        const notes = await Promise.all(
+          record.memberNotes.map(async (note) => {
+            const m = await getMember(note.memberId);
+            return {
+              memberId: note.memberId,
+              memberName: m?.name ?? '不明',
+              avatarColor: m?.avatarColor ?? '#888',
+              attendance: note.attendance,
+              performanceRating: note.performanceRating,
+              goodPoints: note.goodPoints,
+              improvementPoints: note.improvementPoints,
+              memo: note.memo,
+            };
+          })
+        );
+        if (!cancelled) setMemberNotes(notes);
+      } else {
+        const reservations = await getReservationsForInstance(instanceId);
+        const notes = await Promise.all(
+          reservations.map(async (r: { memberId: string }) => {
+            const m = await getMember(r.memberId);
+            return {
+              memberId: r.memberId,
+              memberName: m?.name ?? '不明',
+              avatarColor: m?.avatarColor ?? '#888',
+              attendance: 'present' as AttendanceStatus,
+              performanceRating: 3,
+              goodPoints: '',
+              improvementPoints: '',
+              memo: '',
+            };
+          })
+        );
+        if (!cancelled) setMemberNotes(notes);
+      }
+
+      if (!cancelled) setDataLoaded(true);
+    };
+    loadData();
+    return () => { cancelled = true; };
+  }, [instanceId, getInstanceWithDetails, getRecordForInstance, getReservationsForInstance, getMember]);
 
   const updateMemberNote = (index: number, field: keyof MemberNoteForm, value: string | number) => {
     setMemberNotes(prev => prev.map((note, i) => i === index ? { ...note, [field]: value } : note));
@@ -109,10 +131,10 @@ export default function RecordEditPage() {
       }));
 
       if (existingRecord) {
-        updateRecord(existingRecord.id, { theme, content, memberNotes: noteData });
+        await updateRecord(existingRecord.id, { theme, content, memberNotes: noteData });
         toast.success('レッスン記録を更新しました');
       } else {
-        createRecord({ lessonInstanceId: instanceId, theme, content, memberNotes: noteData });
+        await createRecord({ lessonInstanceId: instanceId, theme, content, memberNotes: noteData });
         toast.success('レッスン記録を保存しました');
       }
       router.push('/admin/records');
@@ -122,6 +144,8 @@ export default function RecordEditPage() {
       setIsSubmitting(false);
     }
   };
+
+  if (loading || recordsLoading || membersLoading || !dataLoaded) return <LoadingSpinner />;
 
   if (!instanceDetails) {
     return (

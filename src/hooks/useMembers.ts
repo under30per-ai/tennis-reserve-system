@@ -1,43 +1,91 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Member, LessonLevel } from '@/types';
-import { memberUseCases } from '@/application/usecases';
+import {
+  getMembers as fetchMembers,
+  getMemberById,
+  createMember,
+  updateMember as updateMemberAction,
+  deleteMember as deleteMemberAction,
+} from '@/app/actions/members';
 
 export default function useMembers() {
-  const [members, setMembers] = useState<Member[]>(() => memberUseCases.getAll());
+  const [members, setMembers] = useState<Member[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const refresh = useCallback(() => {
-    setMembers(memberUseCases.getAll());
+  const refresh = useCallback(async () => {
+    const data = await fetchMembers();
+    setMembers(data);
+    setLoading(false);
   }, []);
 
-  const getMember = useCallback((id: string) => memberUseCases.getById(id), []);
+  useEffect(() => {
+    fetchMembers().then(data => {
+      setMembers(data);
+      setLoading(false);
+    });
+  }, []);
 
-  const addMember = useCallback((data: Omit<Member, 'id' | 'createdAt' | 'updatedAt' | 'avatarColor'>) => {
-    const member = memberUseCases.create(data);
-    refresh();
-    return member;
-  }, [refresh]);
+  const getMember = useCallback(async (id: string) => {
+    return getMemberById(id);
+  }, []);
 
-  const updateMember = useCallback((id: string, data: Partial<Member>) => {
-    const result = memberUseCases.update(id, data);
-    refresh();
-    return result;
-  }, [refresh]);
+  const addMember = useCallback(
+    async (data: Omit<Member, 'id' | 'createdAt' | 'updatedAt' | 'avatarColor'>) => {
+      const member = await createMember(data);
+      await refresh();
+      return member;
+    },
+    [refresh]
+  );
 
-  const deleteMember = useCallback((id: string) => {
-    memberUseCases.remove(id);
-    refresh();
-  }, [refresh]);
+  const updateMember = useCallback(
+    async (id: string, data: Partial<Member>) => {
+      const result = await updateMemberAction(id, data);
+      await refresh();
+      return result;
+    },
+    [refresh]
+  );
 
-  const searchMembers = useCallback((query: string) => {
-    const q = query.toLowerCase();
-    return members.filter(m => m.name.toLowerCase().includes(q) || m.nameKana.toLowerCase().includes(q) || m.email.toLowerCase().includes(q));
-  }, [members]);
+  const deleteMember = useCallback(
+    async (id: string) => {
+      await deleteMemberAction(id);
+      await refresh();
+    },
+    [refresh]
+  );
 
-  const getMembersByLevel = useCallback((level: LessonLevel) => {
-    return members.filter(m => m.level === level && m.isActive);
-  }, [members]);
+  const searchMembers = useCallback(
+    (query: string) => {
+      const q = query.toLowerCase();
+      return members.filter(
+        (m) =>
+          m.name.toLowerCase().includes(q) ||
+          m.nameKana.toLowerCase().includes(q) ||
+          m.email.toLowerCase().includes(q)
+      );
+    },
+    [members]
+  );
 
-  return { members, getMember, addMember, updateMember, deleteMember, searchMembers, getMembersByLevel, refresh };
+  const getMembersByLevel = useCallback(
+    (level: LessonLevel) => {
+      return members.filter((m) => m.level === level && m.isActive);
+    },
+    [members]
+  );
+
+  return {
+    members,
+    loading,
+    getMember,
+    addMember,
+    updateMember,
+    deleteMember,
+    searchMembers,
+    getMembersByLevel,
+    refresh,
+  };
 }

@@ -1,14 +1,18 @@
 'use client';
 
-import { createContext, useContext, useState, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from 'react';
 import { AuthUser } from '@/types';
-import { authUseCases } from '@/application/usecases';
+import {
+  login as loginAction,
+  logout as logoutAction,
+  getAuthUser,
+} from '@/app/actions/auth';
 
 interface AuthContextType {
   user: AuthUser | null;
   loading: boolean;
-  login: (email: string, password: string, role: 'member' | 'admin') => boolean;
-  logout: () => void;
+  login: (email: string, password: string, role: 'member' | 'admin') => Promise<boolean>;
+  logout: () => Promise<void>;
   isAuthenticated: boolean;
   isAdmin: boolean;
 }
@@ -16,32 +20,44 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(() => authUseCases.getStoredUser());
-  const [loading] = useState(false);
+  const [user, setUser] = useState<AuthUser | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const login = useCallback((email: string, password: string, role: 'member' | 'admin'): boolean => {
-    const loggedInUser = authUseCases.login(email, password, role);
-    if (loggedInUser) {
-      setUser(loggedInUser);
-      return true;
-    }
-    return false;
+  useEffect(() => {
+    getAuthUser().then((u) => {
+      setUser(u);
+      setLoading(false);
+    });
   }, []);
 
-  const logout = useCallback(() => {
+  const login = useCallback(
+    async (email: string, password: string, role: 'member' | 'admin'): Promise<boolean> => {
+      const loggedInUser = await loginAction(email, password, role);
+      if (loggedInUser) {
+        setUser(loggedInUser);
+        return true;
+      }
+      return false;
+    },
+    []
+  );
+
+  const logout = useCallback(async () => {
+    await logoutAction();
     setUser(null);
-    authUseCases.logout();
   }, []);
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      loading,
-      login,
-      logout,
-      isAuthenticated: !!user,
-      isAdmin: user?.role === 'admin',
-    }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        loading,
+        login,
+        logout,
+        isAuthenticated: !!user,
+        isAdmin: user?.role === 'admin',
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

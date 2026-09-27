@@ -1,34 +1,69 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { LessonSlot } from '@/types';
-import { lessonSlotUseCases } from '@/application/usecases';
+import {
+  getLessonSlots as fetchLessonSlots,
+  getLessonSlotById,
+  createLessonSlot,
+  updateLessonSlot as updateLessonSlotAction,
+  deleteLessonSlot as deleteLessonSlotAction,
+} from '@/app/actions/lesson-slots';
 
 export default function useLessonSlots() {
-  const [lessonSlots, setLessonSlots] = useState<LessonSlot[]>(() => lessonSlotUseCases.getAll());
+  const [lessonSlots, setLessonSlots] = useState<LessonSlot[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const refresh = useCallback(() => {
-    setLessonSlots(lessonSlotUseCases.getAll());
+  const refresh = useCallback(async () => {
+    const data = await fetchLessonSlots();
+    setLessonSlots(data);
+    setLoading(false);
   }, []);
 
-  const getLessonSlot = useCallback((id: string) => lessonSlotUseCases.getById(id), []);
+  useEffect(() => {
+    fetchLessonSlots().then(data => {
+      setLessonSlots(data);
+      setLoading(false);
+    });
+  }, []);
 
-  const addLessonSlot = useCallback((data: Omit<LessonSlot, 'id' | 'createdAt' | 'updatedAt'>) => {
-    const slot = lessonSlotUseCases.create(data);
-    refresh();
-    return slot;
-  }, [refresh]);
+  const getLessonSlot = useCallback(async (id: string) => {
+    return getLessonSlotById(id);
+  }, []);
 
-  const updateLessonSlot = useCallback((id: string, data: Partial<LessonSlot>) => {
-    const result = lessonSlotUseCases.update(id, data);
-    refresh();
-    return result;
-  }, [refresh]);
+  const addLessonSlot = useCallback(
+    async (data: Omit<LessonSlot, 'id' | 'createdAt' | 'updatedAt'>) => {
+      const slot = await createLessonSlot(data);
+      await refresh();
+      return slot;
+    },
+    [refresh]
+  );
 
-  const deleteLessonSlot = useCallback((id: string) => {
-    lessonSlotUseCases.remove(id);
-    refresh();
-  }, [refresh]);
+  const updateLessonSlot = useCallback(
+    async (id: string, data: Partial<LessonSlot>) => {
+      const result = await updateLessonSlotAction(id, data);
+      await refresh();
+      return result;
+    },
+    [refresh]
+  );
 
-  return { lessonSlots, getLessonSlot, addLessonSlot, updateLessonSlot, deleteLessonSlot, refresh };
+  const deleteLessonSlot = useCallback(
+    async (id: string) => {
+      await deleteLessonSlotAction(id);
+      await refresh();
+    },
+    [refresh]
+  );
+
+  return {
+    lessonSlots,
+    loading,
+    getLessonSlot,
+    addLessonSlot,
+    updateLessonSlot,
+    deleteLessonSlot,
+    refresh,
+  };
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import useAuth from '@/hooks/useAuth';
 import useMembers from '@/hooks/useMembers';
 import useToast from '@/hooks/useToast';
@@ -17,20 +17,28 @@ import { Member } from '@/types';
 
 export default function ProfilePage() {
   const { user } = useAuth();
-  const { getMember, updateMember } = useMembers();
+  const { getMember, updateMember, loading } = useMembers();
   const toast = useToast();
 
-  const [member, setMember] = useState<Member | null>(() => {
-    return user?.memberId ? getMember(user.memberId) : null;
-  });
+  const [member, setMember] = useState<Member | null>(null);
   const [isEditing, setIsEditing] = useState(false);
 
-  if (!member) return <LoadingSpinner />;
+  useEffect(() => {
+    if (user?.memberId) {
+      getMember(user.memberId).then(m => setMember(m));
+    }
+  }, [user, getMember]);
 
-  const handleSave = () => {
-    updateMember(member.id, { name: member.name, nameKana: member.nameKana, phone: member.phone });
-    toast.success('プロフィールを更新しました');
-    setIsEditing(false);
+  if (loading || !member) return <LoadingSpinner />;
+
+  const handleSave = async () => {
+    try {
+      await updateMember(member.id, { name: member.name, nameKana: member.nameKana, phone: member.phone });
+      toast.success('プロフィールを更新しました');
+      setIsEditing(false);
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'プロフィールの更新に失敗しました');
+    }
   };
 
   return (

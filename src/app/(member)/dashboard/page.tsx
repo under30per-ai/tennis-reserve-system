@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import useAuth from '@/hooks/useAuth';
 import useReservations from '@/hooks/useReservations';
@@ -10,23 +10,34 @@ import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
 import { LevelBadge } from '@/components/ui/Badge';
 import EmptyState from '@/components/ui/EmptyState';
+import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import TennisBallIcon from '@/components/tennis/TennisBallIcon';
 import NetDivider from '@/components/tennis/NetDivider';
 import CourtIllustration from '@/components/tennis/CourtIllustration';
 import { RESERVATION_STATUS_LABELS } from '@/lib/constants';
 import { formatDate } from '@/lib/utils';
 import { toISODateString } from '@/lib/utils';
+import { Member, ReservationWithDetails } from '@/types';
 
 export default function MemberDashboardPage() {
   const { user } = useAuth();
-  const { getMemberReservations } = useReservations();
-  const { getMember } = useMembers();
+  const { getMemberReservations, loading: reservationsLoading } = useReservations();
+  const { getMember, loading: membersLoading } = useMembers();
   const router = useRouter();
-  const member = user?.memberId ? getMember(user.memberId) : null;
 
-  const reservations = useMemo(() => {
-    if (!user?.memberId) return [];
-    return getMemberReservations(user.memberId);
+  const [member, setMember] = useState<Member | null>(null);
+  const [reservations, setReservations] = useState<ReservationWithDetails[]>([]);
+
+  useEffect(() => {
+    if (user?.memberId) {
+      getMember(user.memberId).then(m => setMember(m));
+    }
+  }, [user, getMember]);
+
+  useEffect(() => {
+    if (user?.memberId) {
+      getMemberReservations(user.memberId).then(r => setReservations(r));
+    }
   }, [user, getMemberReservations]);
 
   const today = toISODateString(new Date());
@@ -49,6 +60,8 @@ export default function MemberDashboardPage() {
       return true;
     });
   }, [reservations]);
+
+  if (reservationsLoading || membersLoading) return <LoadingSpinner />;
 
   return (
     <div className="space-y-6">
