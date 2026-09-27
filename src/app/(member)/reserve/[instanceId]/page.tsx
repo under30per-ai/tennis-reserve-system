@@ -50,6 +50,8 @@ export default function ReserveConfirmPage() {
   const avail = getAvailabilityLabel(instance.availableSpots, instance.maxCapacity);
   const isFull = instance.availableSpots <= 0;
   const dayOfWeek = new Date(instance.date).getDay();
+  const today = new Date().toISOString().slice(0, 10);
+  const isPast = instance.date < today;
 
   const handleReserve = async () => {
     if (!user?.memberId) return;
@@ -114,24 +116,36 @@ export default function ReserveConfirmPage() {
 
         <NetDivider className="!my-4" />
 
-        {isFull && (
+        {isPast && (
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4">
+            <p className="text-sm text-gray-600 font-medium">このレッスンは終了しました</p>
+          </div>
+        )}
+
+        {!isPast && isFull && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
             <p className="text-sm text-yellow-800 font-medium">定員に達しています</p>
             <p className="text-xs text-yellow-600">キャンセル待ちとして登録されます</p>
           </div>
         )}
 
-        {transferDisabled && (
+        {!isPast && transferDisabled && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
             <p className="text-sm text-yellow-800">振替回数の上限に達しています</p>
           </div>
         )}
 
         <div className="flex gap-3">
-          <Button className="flex-1" onClick={handleReserve} disabled={transferDisabled}>
-            {isTransferMode ? '振替を確定する' : isFull ? 'キャンセル待ちに登録' : '予約を確定する'}
-          </Button>
-          <Button variant="ghost" onClick={() => router.back()}>戻る</Button>
+          {isPast ? (
+            <Button variant="ghost" className="flex-1" onClick={() => router.back()}>戻る</Button>
+          ) : (
+            <>
+              <Button className="flex-1" onClick={handleReserve} disabled={transferDisabled}>
+                {isTransferMode ? '振替を確定する' : isFull ? 'キャンセル待ちに登録' : '予約を確定する'}
+              </Button>
+              <Button variant="ghost" onClick={() => router.back()}>戻る</Button>
+            </>
+          )}
         </div>
       </Card>
     </div>

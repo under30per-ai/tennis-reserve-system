@@ -36,6 +36,11 @@ export async function makeReservation(
   if (instRows.length === 0) throw new Error('レッスンが見つかりません');
   const instance = toLessonInstance(instRows[0]);
 
+  if (instance.isCancelled) throw new Error('このレッスンは中止されています');
+
+  const today = new Date().toISOString().slice(0, 10);
+  if (instance.date < today) throw new Error('過去のレッスンは予約できません');
+
   const existingRows = await db
     .select()
     .from(reservations)
@@ -111,6 +116,27 @@ export async function transferReservation(
   fromInstanceId: string,
   toInstanceId: string
 ): Promise<Reservation> {
+  // Validate target instance
+  const toInstRows = await db
+    .select()
+    .from(lessonInstances)
+    .where(eq(lessonInstances.id, toInstanceId));
+  if (toInstRows.length === 0) throw new Error('振替先のレッスンが見つかりません');
+  const toInstance = toLessonInstance(toInstRows[0]);
+
+  if (toInstance.isCancelled) throw new Error('振替先のレッスンは中止されています');
+
+  const today = new Date().toISOString().slice(0, 10);
+  if (toInstance.date < today) throw new Error('過去のレッスンには振替できません');
+
+  // Validate member has transfers remaining
+  const memberRows = await db
+    .select()
+    .from(members)
+    .where(eq(members.id, memberId));
+  if (memberRows.length === 0) throw new Error('会員情報が見つかりません');
+  if (memberRows[0].remainingTransfers <= 0) throw new Error('振替回数の上限に達しています');
+
   const allRes = await db
     .select()
     .from(reservations)
@@ -147,19 +173,13 @@ export async function transferReservation(
     })
     .returning();
 
-  const memberRows = await db
-    .select()
-    .from(members)
+  await db
+    .update(members)
+    .set({
+      remainingTransfers: memberRows[0].remainingTransfers - 1,
+      updatedAt: new Date(),
+    })
     .where(eq(members.id, memberId));
-  if (memberRows.length > 0 && memberRows[0].remainingTransfers > 0) {
-    await db
-      .update(members)
-      .set({
-        remainingTransfers: memberRows[0].remainingTransfers - 1,
-        updatedAt: new Date(),
-      })
-      .where(eq(members.id, memberId));
-  }
 
   return toReservation(newRows[0]);
 }
