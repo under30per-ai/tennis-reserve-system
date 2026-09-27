@@ -10,9 +10,14 @@ import {
   deleteMember as deleteMemberAction,
 } from '@/app/actions/members';
 
-export default function useMembers() {
+interface UseMembersOptions {
+  eagerLoad?: boolean;
+}
+
+export default function useMembers(options?: UseMembersOptions) {
+  const eagerLoad = options?.eagerLoad ?? false;
   const [members, setMembers] = useState<Member[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(eagerLoad);
 
   const refresh = useCallback(async () => {
     const data = await fetchMembers();
@@ -21,11 +26,12 @@ export default function useMembers() {
   }, []);
 
   useEffect(() => {
+    if (!eagerLoad) return;
     fetchMembers().then(data => {
       setMembers(data);
       setLoading(false);
     });
-  }, []);
+  }, [eagerLoad]);
 
   const getMember = useCallback(async (id: string) => {
     return getMemberById(id);

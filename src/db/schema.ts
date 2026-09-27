@@ -7,6 +7,7 @@ import {
   timestamp,
   jsonb,
   pgEnum,
+  index,
 } from 'drizzle-orm/pg-core';
 
 // ── Enums ──────────────────────────────────────────────
@@ -135,7 +136,11 @@ export const lessonInstances = pgTable('lesson_instances', {
   cancelReason: varchar('cancel_reason', { length: 500 }).notNull().default(''),
   notes: varchar('notes', { length: 2000 }).notNull().default(''),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => [
+  index('idx_lesson_instances_date').on(table.date),
+  index('idx_lesson_instances_date_cancelled').on(table.date, table.isCancelled),
+  index('idx_lesson_instances_lesson_slot_id').on(table.lessonSlotId),
+]);
 
 export const reservations = pgTable('reservations', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -150,7 +155,11 @@ export const reservations = pgTable('reservations', {
   notes: varchar('notes', { length: 2000 }).notNull().default(''),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => [
+  index('idx_reservations_lesson_instance_id').on(table.lessonInstanceId),
+  index('idx_reservations_member_id').on(table.memberId),
+  index('idx_reservations_member_status').on(table.memberId, table.status),
+]);
 
 export const lessonRecords = pgTable('lesson_records', {
   id: uuid('id').primaryKey().defaultRandom(),

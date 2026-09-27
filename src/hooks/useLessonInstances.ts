@@ -7,12 +7,18 @@ import {
   getLessonInstanceById,
   getLessonInstanceWithDetails,
   getInstancesWithDetailsForDate as fetchInstancesWithDetailsForDate,
+  getInstancesWithDetailsForDateRange as fetchInstancesWithDetailsForDateRange,
   cancelLessonInstance,
 } from '@/app/actions/lesson-instances';
 
-export default function useLessonInstances() {
+interface UseLessonInstancesOptions {
+  eagerLoad?: boolean;
+}
+
+export default function useLessonInstances(options?: UseLessonInstancesOptions) {
+  const eagerLoad = options?.eagerLoad ?? false;
   const [instances, setInstances] = useState<LessonInstance[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(eagerLoad);
 
   const refresh = useCallback(async () => {
     const data = await fetchInstances();
@@ -21,11 +27,12 @@ export default function useLessonInstances() {
   }, []);
 
   useEffect(() => {
+    if (!eagerLoad) return;
     fetchInstances().then(data => {
       setInstances(data);
       setLoading(false);
     });
-  }, []);
+  }, [eagerLoad]);
 
   const getInstance = useCallback(async (id: string) => {
     return getLessonInstanceById(id);
@@ -64,6 +71,17 @@ export default function useLessonInstances() {
     []
   );
 
+  const getInstancesWithDetailsForDateRange = useCallback(
+    async (
+      from: string,
+      to: string,
+      includeCancelled = false
+    ): Promise<LessonInstanceWithDetails[]> => {
+      return fetchInstancesWithDetailsForDateRange(from, to, includeCancelled);
+    },
+    []
+  );
+
   const cancelInstance = useCallback(
     async (id: string, reason: string) => {
       await cancelLessonInstance(id, reason);
@@ -80,6 +98,7 @@ export default function useLessonInstances() {
     getInstancesForDateRange,
     getInstanceWithDetails,
     getInstancesWithDetailsForDate,
+    getInstancesWithDetailsForDateRange,
     cancelInstance,
     refresh,
   };

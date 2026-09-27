@@ -167,21 +167,26 @@ export async function transferReservation(
 export async function getMemberReservations(
   memberId: string
 ): Promise<ReservationWithDetails[]> {
-  const resRows = await db
+  const rows = await db
     .select()
     .from(reservations)
+    .innerJoin(lessonInstances, eq(reservations.lessonInstanceId, lessonInstances.id))
+    .innerJoin(lessonSlots, eq(lessonInstances.lessonSlotId, lessonSlots.id))
+    .innerJoin(members, eq(reservations.memberId, members.id))
+    .innerJoin(coaches, eq(lessonInstances.coachId, coaches.id))
+    .innerJoin(courts, eq(lessonInstances.courtId, courts.id))
     .where(eq(reservations.memberId, memberId));
 
-  const results: ReservationWithDetails[] = [];
-  for (const row of resRows) {
-    const r = toReservation(row);
-    const detail = await enrichReservation(r);
-    if (detail) results.push(detail);
-  }
-
-  return results.sort((a, b) =>
-    b.lessonInstance.date.localeCompare(a.lessonInstance.date)
-  );
+  return rows
+    .map((row) => ({
+      ...toReservation(row.reservations),
+      member: toMember(row.members),
+      lessonInstance: toLessonInstance(row.lesson_instances),
+      lessonSlot: toLessonSlot(row.lesson_slots),
+      coach: toCoach(row.coaches),
+      court: toCourt(row.courts),
+    }))
+    .sort((a, b) => b.lessonInstance.date.localeCompare(a.lessonInstance.date));
 }
 
 export async function getReservationsForInstance(
@@ -202,49 +207,23 @@ export async function getReservationsForInstance(
 export async function getAllReservationsWithDetails(): Promise<
   ReservationWithDetails[]
 > {
-  const resRows = await db.select().from(reservations);
-
-  const results: ReservationWithDetails[] = [];
-  for (const row of resRows) {
-    const r = toReservation(row);
-    const detail = await enrichReservation(r);
-    if (detail) results.push(detail);
-  }
-
-  return results.sort((a, b) => b.reservedAt.localeCompare(a.reservedAt));
-}
-
-async function enrichReservation(
-  r: Reservation
-): Promise<ReservationWithDetails | null> {
-  const instRows = await db
+  const rows = await db
     .select()
-    .from(lessonInstances)
-    .where(eq(lessonInstances.id, r.lessonInstanceId));
-  if (instRows.length === 0) return null;
-  const instance = toLessonInstance(instRows[0]);
+    .from(reservations)
+    .innerJoin(lessonInstances, eq(reservations.lessonInstanceId, lessonInstances.id))
+    .innerJoin(lessonSlots, eq(lessonInstances.lessonSlotId, lessonSlots.id))
+    .innerJoin(members, eq(reservations.memberId, members.id))
+    .innerJoin(coaches, eq(lessonInstances.coachId, coaches.id))
+    .innerJoin(courts, eq(lessonInstances.courtId, courts.id));
 
-  const [slotRows, memberRows, coachRows, courtRows] = await Promise.all([
-    db.select().from(lessonSlots).where(eq(lessonSlots.id, instance.lessonSlotId)),
-    db.select().from(members).where(eq(members.id, r.memberId)),
-    db.select().from(coaches).where(eq(coaches.id, instance.coachId)),
-    db.select().from(courts).where(eq(courts.id, instance.courtId)),
-  ]);
-
-  if (
-    slotRows.length === 0 ||
-    memberRows.length === 0 ||
-    coachRows.length === 0 ||
-    courtRows.length === 0
-  )
-    return null;
-
-  return {
-    ...r,
-    member: toMember(memberRows[0]),
-    lessonInstance: instance,
-    lessonSlot: toLessonSlot(slotRows[0]),
-    coach: toCoach(coachRows[0]),
-    court: toCourt(courtRows[0]),
-  };
+  return rows
+    .map((row) => ({
+      ...toReservation(row.reservations),
+      member: toMember(row.members),
+      lessonInstance: toLessonInstance(row.lesson_instances),
+      lessonSlot: toLessonSlot(row.lesson_slots),
+      coach: toCoach(row.coaches),
+      court: toCourt(row.courts),
+    }))
+    .sort((a, b) => b.reservedAt.localeCompare(a.reservedAt));
 }

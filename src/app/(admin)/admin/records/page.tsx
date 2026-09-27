@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { startOfWeek, endOfWeek, addWeeks, format, parseISO } from 'date-fns';
+import { startOfWeek, endOfWeek, addWeeks, subWeeks, format, parseISO } from 'date-fns';
 import { ja } from 'date-fns/locale';
 import useLessonInstances from '@/hooks/useLessonInstances';
 import useLessonRecords from '@/hooks/useLessonRecords';
@@ -18,17 +18,17 @@ import { DAY_LABELS } from '@/lib/constants';
 import { LessonInstanceWithDetails, LessonRecord } from '@/types';
 
 interface DisplayItem {
-  instance: { id: string; date: string; startTime: string; endTime: string; isCancelled: boolean };
-  details: LessonInstanceWithDetails | null;
+  instance: LessonInstanceWithDetails;
   record: LessonRecord | null;
 }
 
 export default function RecordsPage() {
   const router = useRouter();
-  const { instances, getInstanceWithDetails, loading } = useLessonInstances();
-  const { getRecordForInstance, loading: recordsLoading } = useLessonRecords();
+  const { getInstancesWithDetailsForDateRange } = useLessonInstances();
+  const { getRecordForInstance } = useLessonRecords();
   const [weekOffset, setWeekOffset] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
+  const [dataLoading, setDataLoading] = useState(true);
 
   const { weekStart, weekEnd, weekLabel } = useMemo(() => {
     const base = addWeeks(new Date(), weekOffset);
@@ -45,56 +45,48 @@ export default function RecordsPage() {
 
   useEffect(() => {
     let cancelled = false;
-    const loadWeekInstances = async () => {
-      const wsStr = format(weekStart, 'yyyy-MM-dd');
-      const weStr = format(weekEnd, 'yyyy-MM-dd');
-      const filtered = instances.filter(i => i.date >= wsStr && i.date <= weStr && !i.isCancelled);
+    setDataLoading(true);
+    const wsStr = format(weekStart, 'yyyy-MM-dd');
+    const weStr = format(weekEnd, 'yyyy-MM-dd');
+    getInstancesWithDetailsForDateRange(wsStr, weStr).then(async allInstances => {
+      if (cancelled) return;
       const items = await Promise.all(
-        filtered.map(async i => {
-          const details = await getInstanceWithDetails(i.id);
-          const record = await getRecordForInstance(i.id);
-          return { instance: i, details, record };
+        allInstances.map(async inst => {
+          const record = await getRecordForInstance(inst.id);
+          return { instance: inst, record };
         })
       );
       if (!cancelled) {
-        setWeekInstances(
-          items
-            .filter(item => item.details !== null)
-            .sort((a, b) => {
-              const dateCompare = a.instance.date.localeCompare(b.instance.date);
-              if (dateCompare !== 0) return dateCompare;
-              return a.instance.startTime.localeCompare(b.instance.startTime);
-            })
-        );
+        setWeekInstances(items);
+        setDataLoading(false);
       }
-    };
-    loadWeekInstances();
+    });
     return () => { cancelled = true; };
-  }, [instances, weekStart, weekEnd, getInstanceWithDetails, getRecordForInstance]);
+  }, [weekStart, weekEnd, getInstancesWithDetailsForDateRange, getRecordForInstance]);
 
-  // Search results: when searching, show all instances matching the query across all dates
+  // Search results: when searching, fetch a broad range and filter
   const [searchResults, setSearchResults] = useState<DisplayItem[] | null>(null);
 
   useEffect(() => {
     if (!searchQuery.trim()) return;
     let cancelled = false;
-    const loadSearchResults = async () => {
-      const q = searchQuery.toLowerCase();
-      const filtered = instances.filter(i => !i.isCancelled);
+    const q = searchQuery.toLowerCase();
+    const searchFrom = format(subWeeks(new Date(), 52), 'yyyy-MM-dd');
+    const searchTo = format(addWeeks(new Date(), 4), 'yyyy-MM-dd');
+    getInstancesWithDetailsForDateRange(searchFrom, searchTo).then(async allInstances => {
+      if (cancelled) return;
       const items = await Promise.all(
-        filtered.map(async i => {
-          const details = await getInstanceWithDetails(i.id);
-          const record = await getRecordForInstance(i.id);
-          return { instance: i, details, record };
+        allInstances.map(async inst => {
+          const record = await getRecordForInstance(inst.id);
+          return { instance: inst, record };
         })
       );
       if (!cancelled) {
         setSearchResults(
           items
             .filter(item => {
-              if (!item.details) return false;
-              const lessonTitle = item.details.lessonSlot.title.toLowerCase();
-              const coachName = item.details.coach.name.toLowerCase();
+              const lessonTitle = item.instance.lessonSlot.title.toLowerCase();
+              const coachName = item.instance.coach.name.toLowerCase();
               const theme = item.record?.theme?.toLowerCase() || '';
               const content = item.record?.content?.toLowerCase() || '';
               return lessonTitle.includes(q) || coachName.includes(q) || theme.includes(q) || content.includes(q);
@@ -106,15 +98,14 @@ export default function RecordsPage() {
             })
         );
       }
-    };
-    loadSearchResults();
+    });
     return () => { cancelled = true; };
-  }, [searchQuery, instances, getInstanceWithDetails, getRecordForInstance]);
+  }, [searchQuery, getInstancesWithDetailsForDateRange, getRecordForInstance]);
 
   const isSearching = searchQuery.trim().length > 0;
   const displayItems = isSearching ? (searchResults ?? []) : weekInstances;
 
-  if (loading || recordsLoading) return <LoadingSpinner />;
+  if (!isSearching && dataLoading) return <LoadingSpinner />;
 
   return (
     <div className="space-y-4">
@@ -188,8 +179,7 @@ export default function RecordsPage() {
                 </tr>
               </TableHeader>
               <tbody>
-                {displayItems.map(({ instance, details, record }) => {
-                  if (!details) return null;
+                {displayItems.map(({ instance, record }) => {
                   const date = parseISO(instance.date);
                   const dayLabel = DAY_LABELS[date.getDay()];
                   return (
@@ -207,15 +197,15 @@ export default function RecordsPage() {
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <span className="text-sm">{details.lessonSlot.title}</span>
-                          <LevelBadge level={details.lessonSlot.level} />
+                          <span className="text-sm">{instance.lessonSlot.title}</span>
+                          <LevelBadge level={instance.lessonSlot.level} />
                         </div>
                       </TableCell>
                       <TableCell>
-                        <span className="text-sm">{details.coach.name}</span>
+                        <span className="text-sm">{instance.coach.name}</span>
                       </TableCell>
                       <TableCell>
-                        <span className="text-sm">{details.court.name}</span>
+                        <span className="text-sm">{instance.court.name}</span>
                       </TableCell>
                       <TableCell>
                         {record ? (
@@ -245,8 +235,7 @@ export default function RecordsPage() {
 
           {/* Mobile: card list */}
           <div className="sm:hidden space-y-3">
-            {displayItems.map(({ instance, details, record }) => {
-              if (!details) return null;
+            {displayItems.map(({ instance, record }) => {
               const date = parseISO(instance.date);
               const dayLabel = DAY_LABELS[date.getDay()];
               return (
@@ -265,13 +254,13 @@ export default function RecordsPage() {
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <p className="text-sm font-medium text-net-gray">{details.lessonSlot.title}</p>
-                          <LevelBadge level={details.lessonSlot.level} />
+                          <p className="text-sm font-medium text-net-gray">{instance.lessonSlot.title}</p>
+                          <LevelBadge level={instance.lessonSlot.level} />
                         </div>
                         <p className="text-xs text-gray-500 mt-0.5">
-                          {instance.startTime}-{instance.endTime} / {details.coach.name}
+                          {instance.startTime}-{instance.endTime} / {instance.coach.name}
                         </p>
-                        <p className="text-xs text-gray-400">{details.court.name}</p>
+                        <p className="text-xs text-gray-400">{instance.court.name}</p>
                       </div>
                     </div>
                     <div className="flex-shrink-0">

@@ -18,7 +18,7 @@ import { MEMBERSHIP_LABELS } from '@/lib/constants';
 import { formatDate, getInitials } from '@/lib/utils';
 
 export default function MembersPage() {
-  const { members, loading: membersLoading, deleteMember } = useMembers();
+  const { members, loading: membersLoading, deleteMember } = useMembers({ eagerLoad: true });
   const { getMemberLessonHistory, loading: recordsLoading } = useLessonRecords();
   const toast = useToast();
   const router = useRouter();

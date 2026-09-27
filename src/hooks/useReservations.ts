@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { Reservation, ReservationWithDetails } from '@/types';
 import {
   getReservations as fetchReservations,
@@ -14,19 +14,11 @@ import {
 
 export default function useReservations() {
   const [reservations, setReservations] = useState<Reservation[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading] = useState(false);
 
   const refresh = useCallback(async () => {
     const data = await fetchReservations();
     setReservations(data);
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    fetchReservations().then(data => {
-      setReservations(data);
-      setLoading(false);
-    });
   }, []);
 
   const makeReservation = useCallback(

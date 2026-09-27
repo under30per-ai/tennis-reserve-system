@@ -3,7 +3,7 @@
 import { db } from '@/db';
 import { lessonInstances, lessonSlots, coaches, courts, reservations } from '@/db/schema';
 import { toLessonInstance, toLessonSlot, toCoach, toCourt, toReservation } from '@/db/mappers';
-import { eq, and, gte, lte } from 'drizzle-orm';
+import { eq, and, gte, lte, inArray } from 'drizzle-orm';
 import type { LessonInstance, LessonInstanceWithDetails, LessonSlot } from '@/domain/models';
 import { generateInstancesForSlot } from '@/lib/calendar-utils';
 
@@ -61,37 +61,32 @@ export async function getLessonInstancesByDateRange(
 export async function getLessonInstanceWithDetails(
   instanceId: string
 ): Promise<LessonInstanceWithDetails | null> {
-  const instRows = await db
-    .select()
-    .from(lessonInstances)
-    .where(eq(lessonInstances.id, instanceId));
-  if (instRows.length === 0) return null;
-  const instance = toLessonInstance(instRows[0]);
-
-  const [slotRows, coachRows, courtRows, resRows] = await Promise.all([
-    db.select().from(lessonSlots).where(eq(lessonSlots.id, instance.lessonSlotId)),
-    db.select().from(coaches).where(eq(coaches.id, instance.coachId)),
-    db.select().from(courts).where(eq(courts.id, instance.courtId)),
+  const [rows, resRows] = await Promise.all([
+    db
+      .select()
+      .from(lessonInstances)
+      .innerJoin(lessonSlots, eq(lessonInstances.lessonSlotId, lessonSlots.id))
+      .innerJoin(coaches, eq(lessonInstances.coachId, coaches.id))
+      .innerJoin(courts, eq(lessonInstances.courtId, courts.id))
+      .where(eq(lessonInstances.id, instanceId)),
     db
       .select()
       .from(reservations)
       .where(eq(reservations.lessonInstanceId, instanceId)),
   ]);
 
-  if (slotRows.length === 0 || coachRows.length === 0 || courtRows.length === 0) return null;
-
-  const slot = toLessonSlot(slotRows[0]);
-  const coach = toCoach(coachRows[0]);
-  const court = toCourt(courtRows[0]);
+  if (rows.length === 0) return null;
+  const row = rows[0];
+  const instance = toLessonInstance(row.lesson_instances);
   const ress = resRows.map(toReservation);
   const confirmed = ress.filter((r) => r.status === 'confirmed').length;
   const waitlisted = ress.filter((r) => r.status === 'waitlisted').length;
 
   return {
     ...instance,
-    lessonSlot: slot,
-    coach,
-    court,
+    lessonSlot: toLessonSlot(row.lesson_slots),
+    coach: toCoach(row.coaches),
+    court: toCourt(row.courts),
     reservations: ress,
     currentBookings: confirmed,
     waitlistCount: waitlisted,
@@ -138,46 +133,57 @@ export async function getInstancesWithDetailsForDate(
   date: string,
   includeCancelled = false
 ): Promise<LessonInstanceWithDetails[]> {
-  let instRows = await db
+  return getInstancesWithDetailsForDateRange(date, date, includeCancelled);
+}
+
+export async function getInstancesWithDetailsForDateRange(
+  from: string,
+  to: string,
+  includeCancelled = false
+): Promise<LessonInstanceWithDetails[]> {
+  const dateFilter = and(gte(lessonInstances.date, from), lte(lessonInstances.date, to));
+  const rows = await db
     .select()
     .from(lessonInstances)
-    .where(eq(lessonInstances.date, date));
+    .innerJoin(lessonSlots, eq(lessonInstances.lessonSlotId, lessonSlots.id))
+    .innerJoin(coaches, eq(lessonInstances.coachId, coaches.id))
+    .innerJoin(courts, eq(lessonInstances.courtId, courts.id))
+    .where(
+      includeCancelled
+        ? dateFilter
+        : and(dateFilter, eq(lessonInstances.isCancelled, false))
+    );
 
-  if (!includeCancelled) {
-    instRows = instRows.filter((r) => !r.isCancelled);
-  }
+  const instanceIds = rows.map((r) => r.lesson_instances.id);
+  const resRows =
+    instanceIds.length > 0
+      ? await db
+          .select()
+          .from(reservations)
+          .where(inArray(reservations.lessonInstanceId, instanceIds))
+      : [];
+  const allRes = resRows.map(toReservation);
 
-  const results: LessonInstanceWithDetails[] = [];
-
-  for (const instRow of instRows) {
-    const instance = toLessonInstance(instRow);
-    const [slotRows, coachRows, courtRows, resRows] = await Promise.all([
-      db.select().from(lessonSlots).where(eq(lessonSlots.id, instance.lessonSlotId)),
-      db.select().from(coaches).where(eq(coaches.id, instance.coachId)),
-      db.select().from(courts).where(eq(courts.id, instance.courtId)),
-      db
-        .select()
-        .from(reservations)
-        .where(eq(reservations.lessonInstanceId, instance.id)),
-    ]);
-
-    if (slotRows.length === 0 || coachRows.length === 0 || courtRows.length === 0) continue;
-
-    const ress = resRows.map(toReservation);
-    const confirmed = ress.filter((r) => r.status === 'confirmed').length;
-    const waitlisted = ress.filter((r) => r.status === 'waitlisted').length;
-
-    results.push({
-      ...instance,
-      lessonSlot: toLessonSlot(slotRows[0]),
-      coach: toCoach(coachRows[0]),
-      court: toCourt(courtRows[0]),
-      reservations: ress,
-      currentBookings: confirmed,
-      waitlistCount: waitlisted,
-      availableSpots: Math.max(0, instance.maxCapacity - confirmed),
+  return rows
+    .map((row) => {
+      const instance = toLessonInstance(row.lesson_instances);
+      const instRes = allRes.filter((r) => r.lessonInstanceId === instance.id);
+      const confirmed = instRes.filter((r) => r.status === 'confirmed').length;
+      const waitlisted = instRes.filter((r) => r.status === 'waitlisted').length;
+      return {
+        ...instance,
+        lessonSlot: toLessonSlot(row.lesson_slots),
+        coach: toCoach(row.coaches),
+        court: toCourt(row.courts),
+        reservations: instRes,
+        currentBookings: confirmed,
+        waitlistCount: waitlisted,
+        availableSpots: Math.max(0, instance.maxCapacity - confirmed),
+      };
+    })
+    .sort((a, b) => {
+      const dateCompare = a.date.localeCompare(b.date);
+      if (dateCompare !== 0) return dateCompare;
+      return a.startTime.localeCompare(b.startTime);
     });
-  }
-
-  return results.sort((a, b) => a.startTime.localeCompare(b.startTime));
 }

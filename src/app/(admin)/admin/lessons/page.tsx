@@ -16,7 +16,7 @@ import { DAY_LABELS } from '@/lib/constants';
 import { Coach, Court } from '@/types';
 
 export default function LessonsPage() {
-  const { lessonSlots, loading: slotsLoading, deleteLessonSlot } = useLessonSlots();
+  const { lessonSlots, loading: slotsLoading, deleteLessonSlot } = useLessonSlots({ eagerLoad: true });
   const { getCoach, loading: coachesLoading } = useCoaches();
   const { getCourt, loading: courtsLoading } = useCourts();
   const toast = useToast();

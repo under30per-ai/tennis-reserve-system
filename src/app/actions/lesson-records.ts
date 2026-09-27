@@ -81,71 +81,50 @@ export async function getLessonRecordByInstanceId(
 export async function getLessonRecordWithDetails(
   id: string
 ): Promise<LessonRecordWithDetails | null> {
-  const recordRows = await db
+  const rows = await db
     .select()
     .from(lessonRecords)
+    .innerJoin(lessonInstances, eq(lessonRecords.lessonInstanceId, lessonInstances.id))
+    .innerJoin(lessonSlots, eq(lessonInstances.lessonSlotId, lessonSlots.id))
+    .innerJoin(coaches, eq(lessonInstances.coachId, coaches.id))
+    .innerJoin(courts, eq(lessonInstances.courtId, courts.id))
     .where(eq(lessonRecords.id, id));
-  if (recordRows.length === 0) return null;
-  const record = toLessonRecord(recordRows[0]);
 
-  const instRows = await db
-    .select()
-    .from(lessonInstances)
-    .where(eq(lessonInstances.id, record.lessonInstanceId));
-  if (instRows.length === 0) return null;
-  const instance = toLessonInstance(instRows[0]);
-
-  const [slotRows, coachRows, courtRows] = await Promise.all([
-    db.select().from(lessonSlots).where(eq(lessonSlots.id, instance.lessonSlotId)),
-    db.select().from(coaches).where(eq(coaches.id, instance.coachId)),
-    db.select().from(courts).where(eq(courts.id, instance.courtId)),
-  ]);
-
-  if (slotRows.length === 0 || coachRows.length === 0 || courtRows.length === 0)
-    return null;
+  if (rows.length === 0) return null;
+  const row = rows[0];
 
   return {
-    ...record,
-    lessonInstance: instance,
-    lessonSlot: toLessonSlot(slotRows[0]),
-    coach: toCoach(coachRows[0]),
-    court: toCourt(courtRows[0]),
+    ...toLessonRecord(row.lesson_records),
+    lessonInstance: toLessonInstance(row.lesson_instances),
+    lessonSlot: toLessonSlot(row.lesson_slots),
+    coach: toCoach(row.coaches),
+    court: toCourt(row.courts),
   };
 }
 
 export async function getMemberLessonHistory(
   memberId: string
 ): Promise<MemberLessonHistoryEntry[]> {
-  const allRecords = await db.select().from(lessonRecords);
-  const entries: MemberLessonHistoryEntry[] = [];
+  const rows = await db
+    .select()
+    .from(lessonRecords)
+    .innerJoin(lessonInstances, eq(lessonRecords.lessonInstanceId, lessonInstances.id))
+    .innerJoin(lessonSlots, eq(lessonInstances.lessonSlotId, lessonSlots.id))
+    .innerJoin(coaches, eq(lessonInstances.coachId, coaches.id))
+    .innerJoin(courts, eq(lessonInstances.courtId, courts.id));
 
-  for (const row of allRecords) {
-    const record = toLessonRecord(row);
+  const entries: MemberLessonHistoryEntry[] = [];
+  for (const row of rows) {
+    const record = toLessonRecord(row.lesson_records);
     const memberNote = record.memberNotes.find((n) => n.memberId === memberId);
     if (!memberNote) continue;
 
-    const instRows = await db
-      .select()
-      .from(lessonInstances)
-      .where(eq(lessonInstances.id, record.lessonInstanceId));
-    if (instRows.length === 0) continue;
-    const instance = toLessonInstance(instRows[0]);
-
-    const [slotRows, coachRows, courtRows] = await Promise.all([
-      db.select().from(lessonSlots).where(eq(lessonSlots.id, instance.lessonSlotId)),
-      db.select().from(coaches).where(eq(coaches.id, instance.coachId)),
-      db.select().from(courts).where(eq(courts.id, instance.courtId)),
-    ]);
-
-    if (slotRows.length === 0 || coachRows.length === 0 || courtRows.length === 0)
-      continue;
-
     entries.push({
       record,
-      lessonInstance: instance,
-      lessonSlot: toLessonSlot(slotRows[0]),
-      coach: toCoach(coachRows[0]),
-      court: toCourt(courtRows[0]),
+      lessonInstance: toLessonInstance(row.lesson_instances),
+      lessonSlot: toLessonSlot(row.lesson_slots),
+      coach: toCoach(row.coaches),
+      court: toCourt(row.courts),
       memberNote,
     });
   }

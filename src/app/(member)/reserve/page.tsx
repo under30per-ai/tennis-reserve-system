@@ -15,29 +15,30 @@ import { LessonInstanceWithDetails } from '@/types';
 
 export default function ReservePage() {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const { getInstancesWithDetailsForDate, loading } = useLessonInstances();
+  const { getInstancesWithDetailsForDateRange } = useLessonInstances();
   const router = useRouter();
 
   const weekDays = useMemo(() => getWeekDays(currentDate), [currentDate]);
 
   const [instancesByDate, setInstancesByDate] = useState<Record<string, LessonInstanceWithDetails[]>>({});
+  const [dataLoading, setDataLoading] = useState(true);
 
   useEffect(() => {
-    const dateStrings = weekDays.map(day => toISODateString(day));
-    Promise.all(
-      dateStrings.map(dateStr =>
-        getInstancesWithDetailsForDate(dateStr).then(instances => ({ dateStr, instances }))
-      )
-    ).then(results => {
+    setDataLoading(true);
+    const from = toISODateString(weekDays[0]);
+    const to = toISODateString(weekDays[weekDays.length - 1]);
+    getInstancesWithDetailsForDateRange(from, to).then(allInstances => {
       const map: Record<string, LessonInstanceWithDetails[]> = {};
-      for (const { dateStr, instances } of results) {
-        map[dateStr] = instances;
+      for (const inst of allInstances) {
+        if (!map[inst.date]) map[inst.date] = [];
+        map[inst.date].push(inst);
       }
       setInstancesByDate(map);
+      setDataLoading(false);
     });
-  }, [weekDays, getInstancesWithDetailsForDate]);
+  }, [weekDays, getInstancesWithDetailsForDateRange]);
 
-  if (loading) return <LoadingSpinner />;
+  if (dataLoading) return <LoadingSpinner />;
 
   return (
     <div className="space-y-4">

@@ -21,9 +21,9 @@ import { LessonInstanceWithDetails, LessonLevel } from '@/types';
 
 export default function SchedulePage() {
   const [currentDate, setCurrentDate] = useState(new Date());
-  const { getInstancesWithDetailsForDate, cancelInstance, loading } = useLessonInstances();
-  const { getReservationsForInstance, loading: reservationsLoading } = useReservations();
-  const { getMember, loading: membersLoading } = useMembers();
+  const { getInstancesWithDetailsForDateRange, cancelInstance } = useLessonInstances();
+  const { getReservationsForInstance } = useReservations();
+  const { getMember } = useMembers();
   const toast = useToast();
   const [selectedInstance, setSelectedInstance] = useState<LessonInstanceWithDetails | null>(null);
   const [showCancelForm, setShowCancelForm] = useState(false);
@@ -32,21 +32,26 @@ export default function SchedulePage() {
 
   // Store instances per day in state (async loading)
   const [dayInstances, setDayInstances] = useState<Record<string, LessonInstanceWithDetails[]>>({});
+  const [dataLoading, setDataLoading] = useState(true);
   const weekDays = useMemo(() => getWeekDays(currentDate), [currentDate]);
 
   useEffect(() => {
     let cancelled = false;
-    const loadInstances = async () => {
+    setDataLoading(true);
+    const from = toISODateString(weekDays[0]);
+    const to = toISODateString(weekDays[weekDays.length - 1]);
+    getInstancesWithDetailsForDateRange(from, to, true).then(allInstances => {
+      if (cancelled) return;
       const result: Record<string, LessonInstanceWithDetails[]> = {};
-      for (const day of weekDays) {
-        const dateStr = toISODateString(day);
-        result[dateStr] = await getInstancesWithDetailsForDate(dateStr, true);
+      for (const inst of allInstances) {
+        if (!result[inst.date]) result[inst.date] = [];
+        result[inst.date].push(inst);
       }
-      if (!cancelled) setDayInstances(result);
-    };
-    loadInstances();
+      setDayInstances(result);
+      setDataLoading(false);
+    });
     return () => { cancelled = true; };
-  }, [weekDays, getInstancesWithDetailsForDate]);
+  }, [weekDays, getInstancesWithDetailsForDateRange]);
 
   // Store participants in state (async loading)
   const [participants, setParticipants] = useState<{ reservation: { id: string; memberId: string; status: string }; member: { name: string; avatarColor: string; level: LessonLevel } | null }[]>([]);
@@ -93,7 +98,7 @@ export default function SchedulePage() {
     }
   };
 
-  if (loading || reservationsLoading || membersLoading) return <LoadingSpinner />;
+  if (dataLoading) return <LoadingSpinner />;
 
   return (
     <div className="space-y-4">

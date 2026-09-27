@@ -10,9 +10,14 @@ import {
   deleteLessonSlot as deleteLessonSlotAction,
 } from '@/app/actions/lesson-slots';
 
-export default function useLessonSlots() {
+interface UseLessonSlotsOptions {
+  eagerLoad?: boolean;
+}
+
+export default function useLessonSlots(options?: UseLessonSlotsOptions) {
+  const eagerLoad = options?.eagerLoad ?? false;
   const [lessonSlots, setLessonSlots] = useState<LessonSlot[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(eagerLoad);
 
   const refresh = useCallback(async () => {
     const data = await fetchLessonSlots();
@@ -21,11 +26,12 @@ export default function useLessonSlots() {
   }, []);
 
   useEffect(() => {
+    if (!eagerLoad) return;
     fetchLessonSlots().then(data => {
       setLessonSlots(data);
       setLoading(false);
     });
-  }, []);
+  }, [eagerLoad]);
 
   const getLessonSlot = useCallback(async (id: string) => {
     return getLessonSlotById(id);

@@ -17,9 +17,14 @@ import {
   getReservationsForInstance as fetchReservationsForInstance,
 } from '@/app/actions/lesson-records';
 
-export default function useLessonRecords() {
+interface UseLessonRecordsOptions {
+  eagerLoad?: boolean;
+}
+
+export default function useLessonRecords(options?: UseLessonRecordsOptions) {
+  const eagerLoad = options?.eagerLoad ?? false;
   const [records, setRecords] = useState<LessonRecord[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(eagerLoad);
 
   const refresh = useCallback(async () => {
     const data = await fetchRecords();
@@ -28,11 +33,12 @@ export default function useLessonRecords() {
   }, []);
 
   useEffect(() => {
+    if (!eagerLoad) return;
     fetchRecords().then(data => {
       setRecords(data);
       setLoading(false);
     });
-  }, []);
+  }, [eagerLoad]);
 
   const getRecordForInstance = useCallback(
     async (instanceId: string): Promise<LessonRecord | null> => {

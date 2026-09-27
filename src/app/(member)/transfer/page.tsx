@@ -7,7 +7,6 @@ import useAuth from '@/hooks/useAuth';
 import useReservations from '@/hooks/useReservations';
 import useLessonInstances from '@/hooks/useLessonInstances';
 import useMembers from '@/hooks/useMembers';
-import useLessonSlots from '@/hooks/useLessonSlots';
 import Card, { CardTitle } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
@@ -23,17 +22,17 @@ import { ReservationWithDetails, Member, LessonInstanceWithDetails } from '@/typ
 export default function TransferPage() {
   const router = useRouter();
   const { user } = useAuth();
-  const { getMemberReservations, loading: reservationsLoading } = useReservations();
-  const { getInstanceWithDetails, instances, loading: instancesLoading } = useLessonInstances();
-  const { getMember, loading: membersLoading } = useMembers();
-  const { lessonSlots: slots } = useLessonSlots();
+  const { getMemberReservations } = useReservations();
+  const { getInstanceWithDetails, getInstancesWithDetailsForDateRange } = useLessonInstances();
+  const { getMember } = useMembers();
 
   const [selectedFrom, setSelectedFrom] = useState<string | null>(null);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [member, setMember] = useState<Member | null>(null);
   const [reservations, setReservations] = useState<ReservationWithDetails[]>([]);
+  const [reservationsLoaded, setReservationsLoaded] = useState(false);
   const [completedTransferData, setCompletedTransferData] = useState<{ reservation: ReservationWithDetails; fromInstance: LessonInstanceWithDetails | null }[]>([]);
-  const [availableTargets, setAvailableTargets] = useState<(LessonInstanceWithDetails | null)[]>([]);
+  const [availableTargets, setAvailableTargets] = useState<LessonInstanceWithDetails[]>([]);
 
   const weekDays = useMemo(() => getWeekDays(currentDate), [currentDate]);
 
@@ -45,7 +44,10 @@ export default function TransferPage() {
 
   useEffect(() => {
     if (user?.memberId) {
-      getMemberReservations(user.memberId).then(r => setReservations(r));
+      getMemberReservations(user.memberId).then(r => {
+        setReservations(r);
+        setReservationsLoaded(true);
+      });
     }
   }, [user, getMemberReservations]);
 
@@ -84,37 +86,37 @@ export default function TransferPage() {
     );
   }, [reservations]);
 
-  // Resolve available targets asynchronously
+  // Resolve available targets using date range query (8 weeks from today)
   useEffect(() => {
     if (!selectedFrom) return;
     const fromResItem = transferEligible.find(r => r.id === selectedFrom);
     if (!fromResItem) return;
-    const fromSlot = slots.find(s => s.id === fromResItem.lessonInstance.lessonSlotId);
-    if (!fromSlot) return;
+    const fromLevel = fromResItem.lessonSlot.level;
 
     const today = toISODateString(new Date());
+    const eightWeeksLater = toISODateString(addWeeks(new Date(), 8));
     const memberInstanceIds = new Set(
       reservations
         .filter(r => r.status === 'confirmed' || r.status === 'waitlisted' || r.status === 'cancelled')
         .map(r => r.lessonInstanceId)
     );
 
-    const candidateInstances = instances
-      .filter(i => i.date > today && !i.isCancelled && !memberInstanceIds.has(i.id));
-
-    Promise.all(
-      candidateInstances.map(i => getInstanceWithDetails(i.id))
-    ).then(resolved => {
-      const filtered = resolved
-        .filter(i => i !== null && i.lessonSlot.level === fromSlot.level && i.availableSpots > 0)
-        .sort((a, b) => a!.date.localeCompare(b!.date));
+    getInstancesWithDetailsForDateRange(today, eightWeeksLater).then(allInstances => {
+      const filtered = allInstances
+        .filter(i =>
+          i.date > today &&
+          !memberInstanceIds.has(i.id) &&
+          i.lessonSlot.level === fromLevel &&
+          i.availableSpots > 0
+        )
+        .sort((a, b) => a.date.localeCompare(b.date));
       setAvailableTargets(filtered);
     });
-  }, [selectedFrom, transferEligible, reservations, instances, getInstanceWithDetails, slots]);
+  }, [selectedFrom, transferEligible, reservations, getInstancesWithDetailsForDateRange]);
 
   const fromRes = transferEligible.find(r => r.id === selectedFrom);
 
-  if (reservationsLoading || instancesLoading || membersLoading) return <LoadingSpinner />;
+  if (!reservationsLoaded) return <LoadingSpinner />;
 
   return (
     <div className="space-y-6">
@@ -208,7 +210,7 @@ export default function TransferPage() {
           <div className="space-y-4">
             {weekDays.map(day => {
               const dateStr = toISODateString(day);
-              const dayTargets = availableTargets.filter(inst => inst && inst.date === dateStr);
+              const dayTargets = availableTargets.filter(inst => inst.date === dateStr);
               const today = isToday(day);
               return (
                 <div key={dateStr}>
@@ -224,7 +226,6 @@ export default function TransferPage() {
                   ) : (
                     <div className="ml-10 space-y-2">
                       {dayTargets.map(inst => {
-                        if (!inst) return null;
                         const avail = getAvailabilityLabel(inst.availableSpots, inst.maxCapacity);
                         return (
                           <Card key={inst.id} className="cursor-pointer hover:border-court-grass/50" onClick={() => {
