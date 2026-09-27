@@ -5,17 +5,20 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import useAuth from '@/hooks/useAuth';
 import useToast from '@/hooks/useToast';
+import { registerMember } from '@/app/actions/members';
 import Input from '@/components/ui/Input';
 import Button from '@/components/ui/Button';
-import Tabs from '@/components/ui/Tabs';
 import TennisBallIcon from '@/components/tennis/TennisBallIcon';
 import CourtBackground from '@/components/tennis/CourtBackground';
 import NetDivider from '@/components/tennis/NetDivider';
 
-export default function LoginPage() {
-  const [activeTab, setActiveTab] = useState<'member' | 'admin'>('member');
+export default function RegisterPage() {
+  const [name, setName] = useState('');
+  const [nameKana, setNameKana] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordConfirm, setPasswordConfirm] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const router = useRouter();
@@ -25,18 +28,30 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (password !== passwordConfirm) {
+      setError('パスワードが一致しません');
+      return;
+    }
+
     setSubmitting(true);
 
     try {
-      const success = await login(email, password, activeTab);
-      if (success) {
-        toast.success('ログインしました');
-        router.push(activeTab === 'admin' ? '/admin' : '/dashboard');
+      const result = await registerMember({ name, nameKana, email, phone, password });
+      if (!result.success) {
+        setError(result.error);
+        return;
+      }
+
+      const loggedIn = await login(email, password, 'member');
+      if (loggedIn) {
+        toast.success('会員登録が完了しました');
+        router.push('/dashboard');
       } else {
-        setError('メールアドレスまたはパスワードが正しくありません');
+        setError('登録は完了しましたが、ログインに失敗しました。ログイン画面からお試しください。');
       }
     } catch {
-      setError('ログイン中にエラーが発生しました');
+      setError('登録中にエラーが発生しました');
     } finally {
       setSubmitting(false);
     }
@@ -53,34 +68,42 @@ export default function LoginPage() {
               <TennisBallIcon size={48} />
             </div>
           </div>
-          <h1 className="text-2xl font-bold text-net-dark">テニススクール</h1>
-          <p className="text-sm text-gray-500 mt-1">予約管理システム</p>
+          <h1 className="text-2xl font-bold text-net-dark">新規会員登録</h1>
+          <p className="text-sm text-gray-500 mt-1">テニススクール予約管理システム</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl border border-court-grass/10 overflow-hidden">
-          <div className="px-6 pt-6">
-            <Tabs
-              tabs={[
-                { key: 'member', label: '会員ログイン' },
-                { key: 'admin', label: '管理者ログイン' },
-              ]}
-              activeTab={activeTab}
-              onChange={(key) => {
-                setActiveTab(key as 'member' | 'admin');
-                setError('');
-                setEmail('');
-                setPassword('');
-              }}
-            />
-          </div>
-
           <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <Input
+              label="氏名"
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="山田 太郎"
+              required
+            />
+            <Input
+              label="フリガナ"
+              type="text"
+              value={nameKana}
+              onChange={(e) => setNameKana(e.target.value)}
+              placeholder="ヤマダ タロウ"
+              required
+            />
             <Input
               label="メールアドレス"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="example@tennis.jp"
+              required
+            />
+            <Input
+              label="電話番号"
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="090-1234-5678"
               required
             />
             <Input
@@ -91,6 +114,14 @@ export default function LoginPage() {
               placeholder="パスワード"
               required
             />
+            <Input
+              label="パスワード（確認）"
+              type="password"
+              value={passwordConfirm}
+              onChange={(e) => setPasswordConfirm(e.target.value)}
+              placeholder="パスワード（確認）"
+              required
+            />
 
             {error && (
               <div className="bg-red-50 text-red-600 text-sm p-3 rounded-lg">
@@ -99,21 +130,15 @@ export default function LoginPage() {
             )}
 
             <Button type="submit" className="w-full" disabled={submitting}>
-              {submitting ? 'ログイン中...' : 'ログイン'}
+              {submitting ? '登録中...' : '会員登録'}
             </Button>
-
-            <div className="text-center">
-              <Link href="/register" className="text-sm text-court-green hover:underline">
-                新規会員登録はこちら
-              </Link>
-            </div>
 
             <NetDivider className="!my-4" />
 
-            <div className="text-xs text-gray-400 text-center space-y-1">
-              <p>デモアカウント:</p>
-              <p>会員: member@tennis.jp / member</p>
-              <p>管理者: admin@tennis.jp / admin</p>
+            <div className="text-center">
+              <Link href="/login" className="text-sm text-court-green hover:underline">
+                ログイン画面に戻る
+              </Link>
             </div>
           </form>
         </div>

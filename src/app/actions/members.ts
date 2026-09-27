@@ -83,6 +83,36 @@ export async function searchMembers(query: string): Promise<Member[]> {
   return rows.map(toMember);
 }
 
+export async function registerMember(data: {
+  name: string;
+  nameKana: string;
+  email: string;
+  phone: string;
+  password: string;
+}): Promise<{ success: true; member: Member } | { success: false; error: string }> {
+  const existing = await getMemberByEmail(data.email);
+  if (existing) {
+    return { success: false, error: 'このメールアドレスは既に登録されています' };
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const member = await createMember({
+    name: data.name,
+    nameKana: data.nameKana,
+    email: data.email,
+    phone: data.phone,
+    password: data.password,
+    level: 'beginner',
+    membershipType: 'regular',
+    joinDate: today,
+    isActive: true,
+    notes: '',
+    remainingTransfers: 3,
+  });
+
+  return { success: true, member };
+}
+
 export async function getMembersByLevel(level: LessonLevel): Promise<Member[]> {
   const rows = await db
     .select()
