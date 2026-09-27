@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useMemo, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { format, addWeeks, subWeeks, isToday } from 'date-fns';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { format, addWeeks, subWeeks, isToday, parseISO } from 'date-fns';
 import useLessonInstances from '@/hooks/useLessonInstances';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
@@ -14,14 +14,29 @@ import { toISODateString, getAvailabilityLabel } from '@/lib/utils';
 import { LessonInstanceWithDetails } from '@/types';
 
 export default function ReservePage() {
-  const [currentDate, setCurrentDate] = useState(new Date());
-  const { getInstancesWithDetailsForDateRange } = useLessonInstances();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const weekParam = searchParams.get('week');
+
+  const [currentDate, setCurrentDate] = useState(() => {
+    if (weekParam) {
+      try { return parseISO(weekParam); } catch { /* fall through */ }
+    }
+    return new Date();
+  });
+
+  const { getInstancesWithDetailsForDateRange } = useLessonInstances();
 
   const weekDays = useMemo(() => getWeekDays(currentDate), [currentDate]);
 
   const [instancesByDate, setInstancesByDate] = useState<Record<string, LessonInstanceWithDetails[]>>({});
   const [dataLoading, setDataLoading] = useState(true);
+
+  const updateWeek = (nextDate: Date) => {
+    setCurrentDate(nextDate);
+    const dateStr = toISODateString(nextDate);
+    router.replace(`/reserve?week=${dateStr}`, { scroll: false });
+  };
 
   useEffect(() => {
     setDataLoading(true);
@@ -43,9 +58,9 @@ export default function ReservePage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <Button variant="ghost" size="sm" onClick={() => setCurrentDate(d => subWeeks(d, 1))}>← 前週</Button>
+        <Button variant="ghost" size="sm" onClick={() => updateWeek(subWeeks(currentDate, 1))}>← 前週</Button>
         <h2 className="font-bold text-net-dark text-sm">{formatWeekRange(currentDate)}</h2>
-        <Button variant="ghost" size="sm" onClick={() => setCurrentDate(d => addWeeks(d, 1))}>次週 →</Button>
+        <Button variant="ghost" size="sm" onClick={() => updateWeek(addWeeks(currentDate, 1))}>次週 →</Button>
       </div>
 
       <div className="space-y-4">
