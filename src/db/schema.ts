@@ -161,6 +161,18 @@ export const reservations = pgTable('reservations', {
   index('idx_reservations_member_status').on(table.memberId, table.status),
 ]);
 
+export const emailVerifications = pgTable('email_verifications', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  email: varchar('email', { length: 255 }).notNull(),
+  code: varchar('code', { length: 6 }).notNull(),
+  name: varchar('name', { length: 255 }).notNull(),
+  nameKana: varchar('name_kana', { length: 255 }).notNull(),
+  phone: varchar('phone', { length: 50 }).notNull(),
+  password: varchar('password', { length: 255 }).notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
 export const lessonRecords = pgTable('lesson_records', {
   id: uuid('id').primaryKey().defaultRandom(),
   lessonInstanceId: uuid('lesson_instance_id').notNull().references(() => lessonInstances.id).unique(),

@@ -10,7 +10,7 @@ import Button from '@/components/ui/Button';
 import Tabs from '@/components/ui/Tabs';
 import TennisBallIcon from '@/components/tennis/TennisBallIcon';
 import CourtBackground from '@/components/tennis/CourtBackground';
-import NetDivider from '@/components/tennis/NetDivider';
+
 
 export default function LoginPage() {
   const [activeTab, setActiveTab] = useState<'member' | 'admin'>('member');
@@ -108,13 +108,6 @@ export default function LoginPage() {
               </Link>
             </div>
 
-            <NetDivider className="!my-4" />
-
-            <div className="text-xs text-gray-400 text-center space-y-1">
-              <p>デモアカウント:</p>
-              <p>会員: member@tennis.jp / member</p>
-              <p>管理者: admin@tennis.jp / admin</p>
-            </div>
           </form>
         </div>
       </div>
