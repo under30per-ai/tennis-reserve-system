@@ -13,11 +13,11 @@ const COOKIE_NAME = 'tennis_auth';
 const AUTH_EXPIRY_SECONDS = 24 * 60 * 60; // 24 hours
 
 function getAdminEmail(): string {
-  return process.env.ADMIN_EMAIL || 'admin@tennis.jp';
+  return (process.env.ADMIN_EMAIL || 'admin@tennis.jp').trim();
 }
 
 function getAdminPasswordHash(): string {
-  const hash = process.env.ADMIN_PASSWORD_HASH;
+  const hash = process.env.ADMIN_PASSWORD_HASH?.trim();
   if (!hash) {
     throw new Error('ADMIN_PASSWORD_HASH environment variable is required');
   }

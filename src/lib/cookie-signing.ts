@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
 function getSecret(): string {
-  const secret = process.env.COOKIE_SECRET;
+  const secret = process.env.COOKIE_SECRET?.trim();
   if (!secret) {
     throw new Error('COOKIE_SECRET environment variable is required');
   }
