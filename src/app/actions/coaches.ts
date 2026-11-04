@@ -6,13 +6,16 @@ import { toCoach } from '@/db/mappers';
 import { eq } from 'drizzle-orm';
 import type { Coach } from '@/domain/models';
 import { getRandomAvatarColor } from '@/lib/utils';
+import { requireAdmin, requireAuth } from '@/app/actions/auth';
 
 export async function getCoaches(): Promise<Coach[]> {
+  await requireAuth();
   const rows = await db.select().from(coaches);
   return rows.map(toCoach);
 }
 
 export async function getCoachById(id: string): Promise<Coach | null> {
+  await requireAuth();
   const rows = await db.select().from(coaches).where(eq(coaches.id, id));
   return rows.length > 0 ? toCoach(rows[0]) : null;
 }
@@ -20,6 +23,7 @@ export async function getCoachById(id: string): Promise<Coach | null> {
 export async function createCoach(
   data: Omit<Coach, 'id' | 'createdAt' | 'updatedAt' | 'avatarColor'>
 ): Promise<Coach> {
+  await requireAdmin();
   const rows = await db
     .insert(coaches)
     .values({
@@ -38,6 +42,7 @@ export async function createCoach(
 }
 
 export async function updateCoach(id: string, data: Partial<Coach>): Promise<Coach | null> {
+  await requireAdmin();
   const values: Record<string, unknown> = { updatedAt: new Date() };
   if (data.name !== undefined) values.name = data.name;
   if (data.nameKana !== undefined) values.nameKana = data.nameKana;
@@ -54,5 +59,6 @@ export async function updateCoach(id: string, data: Partial<Coach>): Promise<Coa
 }
 
 export async function deleteCoach(id: string): Promise<void> {
+  await requireAdmin();
   await db.delete(coaches).where(eq(coaches.id, id));
 }

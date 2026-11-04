@@ -8,9 +8,14 @@ import { eq, or, ilike, and, gt } from 'drizzle-orm';
 import type { Member, LessonLevel } from '@/domain/models';
 import { getRandomAvatarColor } from '@/lib/utils';
 import { sendVerificationCode } from '@/lib/email';
-import { validateEmail, validateRequired, validatePhone } from '@/lib/validators';
+import { validateEmail, validateRequired, validatePhone, validatePassword } from '@/lib/validators';
+import { hashPassword } from '@/lib/password';
+import { requireAdmin } from '@/app/actions/auth';
+
+const MAX_OTP_ATTEMPTS = 5;
 
 export async function getMembers(): Promise<Member[]> {
+  await requireAdmin();
   const rows = await db.select().from(members);
   return rows.map(toMember);
 }
@@ -49,6 +54,7 @@ export async function createMember(
 }
 
 export async function updateMember(id: string, data: Partial<Member>): Promise<Member | null> {
+  await requireAdmin();
   const values: Record<string, unknown> = { updatedAt: new Date() };
   if (data.name !== undefined) values.name = data.name;
   if (data.nameKana !== undefined) values.nameKana = data.nameKana;
@@ -59,7 +65,7 @@ export async function updateMember(id: string, data: Partial<Member>): Promise<M
   if (data.joinDate !== undefined) values.joinDate = data.joinDate;
   if (data.isActive !== undefined) values.isActive = data.isActive;
   if (data.notes !== undefined) values.notes = data.notes;
-  if (data.password !== undefined) values.password = data.password;
+  if (data.password !== undefined) values.password = await hashPassword(data.password);
   if (data.avatarColor !== undefined) values.avatarColor = data.avatarColor;
   if (data.remainingTransfers !== undefined) values.remainingTransfers = data.remainingTransfers;
 
@@ -68,10 +74,12 @@ export async function updateMember(id: string, data: Partial<Member>): Promise<M
 }
 
 export async function deleteMember(id: string): Promise<void> {
+  await requireAdmin();
   await db.delete(members).where(eq(members.id, id));
 }
 
 export async function searchMembers(query: string): Promise<Member[]> {
+  await requireAdmin();
   const pattern = `%${query}%`;
   const rows = await db
     .select()
@@ -106,7 +114,7 @@ export async function registerMember(data: {
   const phoneError = validatePhone(data.phone);
   if (phoneError) return { success: false, error: phoneError };
 
-  const passwordError = validateRequired(data.password, 'パスワード');
+  const passwordError = validatePassword(data.password);
   if (passwordError) return { success: false, error: passwordError };
 
   const existing = await getMemberByEmail(data.email);
@@ -120,13 +128,16 @@ export async function registerMember(data: {
   const code = String(randomInt(100000, 999999));
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
+  // Hash the password before storing in the verification table
+  const hashedPassword = await hashPassword(data.password);
+
   await db.insert(emailVerifications).values({
     email: data.email,
     code,
     name: data.name,
     nameKana: data.nameKana,
     phone: data.phone,
-    password: data.password,
+    password: hashedPassword,
     expiresAt,
   });
 
@@ -145,35 +156,38 @@ export async function verifyEmail(data: {
   email: string;
   code: string;
 }): Promise<{ success: true; member: Member } | { success: false; error: string }> {
-  const rows = await db
+  // Check attempt count first
+  const existing = await db
     .select()
     .from(emailVerifications)
-    .where(
-      and(
-        eq(emailVerifications.email, data.email),
-        eq(emailVerifications.code, data.code),
-        gt(emailVerifications.expiresAt, new Date())
-      )
-    );
+    .where(eq(emailVerifications.email, data.email));
 
-  if (rows.length === 0) {
-    // Check if expired
-    const expired = await db
-      .select()
-      .from(emailVerifications)
-      .where(
-        and(
-          eq(emailVerifications.email, data.email),
-          eq(emailVerifications.code, data.code)
-        )
-      );
-    if (expired.length > 0) {
-      return { success: false, error: '認証コードの有効期限が切れています。再送してください。' };
-    }
+  if (existing.length === 0) {
     return { success: false, error: '認証コードが正しくありません。' };
   }
 
-  const verification = rows[0];
+  const verification = existing[0];
+
+  if (verification.attempts >= MAX_OTP_ATTEMPTS) {
+    // Delete the verification to force re-registration
+    await db.delete(emailVerifications).where(eq(emailVerifications.email, data.email));
+    return { success: false, error: '認証コードの試行回数上限に達しました。最初から登録し直してください。' };
+  }
+
+  // Check expiration
+  if (new Date() > verification.expiresAt) {
+    return { success: false, error: '認証コードの有効期限が切れています。再送してください。' };
+  }
+
+  // Increment attempt count before checking the code
+  await db
+    .update(emailVerifications)
+    .set({ attempts: verification.attempts + 1 })
+    .where(eq(emailVerifications.id, verification.id));
+
+  if (verification.code !== data.code) {
+    return { success: false, error: '認証コードが正しくありません。' };
+  }
 
   // Check if email was registered while verifying
   const existingMember = await getMemberByEmail(data.email);
@@ -188,7 +202,7 @@ export async function verifyEmail(data: {
     nameKana: verification.nameKana,
     email: verification.email,
     phone: verification.phone,
-    password: verification.password,
+    password: verification.password, // Already hashed during registration
     level: 'beginner',
     membershipType: 'regular',
     joinDate: today,
@@ -225,7 +239,7 @@ export async function resendVerificationCode(email: string): Promise<{ success: 
     name: verification.name,
     nameKana: verification.nameKana,
     phone: verification.phone,
-    password: verification.password,
+    password: verification.password, // Already hashed
     expiresAt,
   });
 

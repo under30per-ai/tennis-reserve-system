@@ -24,8 +24,10 @@ import type {
   LessonInstanceWithDetails,
   ReservationWithDetails,
 } from '@/domain/models';
+import { requireAdmin } from '@/app/actions/auth';
 
 export async function getDashboardStats(): Promise<DashboardStats> {
+  await requireAdmin();
   const today = format(new Date(), 'yyyy-MM-dd');
   const weekStart = format(subDays(new Date(), 6), 'yyyy-MM-dd');
 

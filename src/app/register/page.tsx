@@ -32,6 +32,18 @@ export default function RegisterPage() {
     e.preventDefault();
     setError('');
 
+    if (password.length < 8) {
+      setError('パスワードは8文字以上で入力してください');
+      return;
+    }
+    if (!/[a-zA-Z]/.test(password)) {
+      setError('パスワードにはアルファベットを含めてください');
+      return;
+    }
+    if (!/[0-9]/.test(password)) {
+      setError('パスワードには数字を含めてください');
+      return;
+    }
     if (password !== passwordConfirm) {
       setError('パスワードが一致しません');
       return;
@@ -154,7 +166,7 @@ export default function RegisterPage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="パスワード"
+                placeholder="英字・数字を含む8文字以上"
                 required
               />
               <Input

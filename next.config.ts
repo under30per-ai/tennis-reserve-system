@@ -5,6 +5,17 @@ const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_SENTRY_DSN: process.env.SENTRY_DSN || process.env.NEXT_PUBLIC_SENTRY_DSN || "",
   },
+  headers: async () => [
+    {
+      source: "/(.*)",
+      headers: [
+        { key: "X-Frame-Options", value: "DENY" },
+        { key: "X-Content-Type-Options", value: "nosniff" },
+        { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+        { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+      ],
+    },
+  ],
 };
 
 export default withSentryConfig(nextConfig, {

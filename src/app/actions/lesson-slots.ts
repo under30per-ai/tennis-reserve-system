@@ -5,13 +5,16 @@ import { lessonSlots } from '@/db/schema';
 import { toLessonSlot } from '@/db/mappers';
 import { eq } from 'drizzle-orm';
 import type { LessonSlot } from '@/domain/models';
+import { requireAdmin, requireAuth } from '@/app/actions/auth';
 
 export async function getLessonSlots(): Promise<LessonSlot[]> {
+  await requireAuth();
   const rows = await db.select().from(lessonSlots);
   return rows.map(toLessonSlot);
 }
 
 export async function getLessonSlotById(id: string): Promise<LessonSlot | null> {
+  await requireAuth();
   const rows = await db.select().from(lessonSlots).where(eq(lessonSlots.id, id));
   return rows.length > 0 ? toLessonSlot(rows[0]) : null;
 }
@@ -19,6 +22,7 @@ export async function getLessonSlotById(id: string): Promise<LessonSlot | null> 
 export async function createLessonSlot(
   data: Omit<LessonSlot, 'id' | 'createdAt' | 'updatedAt'>
 ): Promise<LessonSlot> {
+  await requireAdmin();
   const rows = await db
     .insert(lessonSlots)
     .values({
@@ -46,6 +50,7 @@ export async function updateLessonSlot(
   id: string,
   data: Partial<LessonSlot>
 ): Promise<LessonSlot | null> {
+  await requireAdmin();
   const values: Record<string, unknown> = { updatedAt: new Date() };
   if (data.title !== undefined) values.title = data.title;
   if (data.level !== undefined) values.level = data.level;
@@ -68,5 +73,6 @@ export async function updateLessonSlot(
 }
 
 export async function deleteLessonSlot(id: string): Promise<void> {
+  await requireAdmin();
   await db.delete(lessonSlots).where(eq(lessonSlots.id, id));
 }

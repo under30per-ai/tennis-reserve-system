@@ -32,3 +32,11 @@ export function validateCapacity(capacity: number): string | null {
   if (capacity > 100) return '定員は100以下を設定してください';
   return null;
 }
+
+export function validatePassword(password: string): string | null {
+  if (!password) return 'パスワードを入力してください';
+  if (password.length < 8) return 'パスワードは8文字以上で入力してください';
+  if (!/[a-zA-Z]/.test(password)) return 'パスワードにはアルファベットを含めてください';
+  if (!/[0-9]/.test(password)) return 'パスワードには数字を含めてください';
+  return null;
+}

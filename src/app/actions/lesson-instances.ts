@@ -6,13 +6,16 @@ import { toLessonInstance, toLessonSlot, toCoach, toCourt, toReservation } from 
 import { eq, and, gte, lte, inArray } from 'drizzle-orm';
 import type { LessonInstance, LessonInstanceWithDetails, LessonSlot } from '@/domain/models';
 import { generateInstancesForSlot } from '@/lib/calendar-utils';
+import { requireAdmin, requireAuth } from '@/app/actions/auth';
 
 export async function getLessonInstances(): Promise<LessonInstance[]> {
+  await requireAuth();
   const rows = await db.select().from(lessonInstances);
   return rows.map(toLessonInstance);
 }
 
 export async function getLessonInstanceById(id: string): Promise<LessonInstance | null> {
+  await requireAuth();
   const rows = await db.select().from(lessonInstances).where(eq(lessonInstances.id, id));
   return rows.length > 0 ? toLessonInstance(rows[0]) : null;
 }
@@ -21,6 +24,7 @@ export async function updateLessonInstance(
   id: string,
   data: Partial<LessonInstance>
 ): Promise<LessonInstance | null> {
+  await requireAdmin();
   const values: Record<string, unknown> = {};
   if (data.coachId !== undefined) values.coachId = data.coachId;
   if (data.courtId !== undefined) values.courtId = data.courtId;
@@ -40,6 +44,7 @@ export async function updateLessonInstance(
 }
 
 export async function getLessonInstancesByDate(date: string): Promise<LessonInstance[]> {
+  await requireAuth();
   const rows = await db
     .select()
     .from(lessonInstances)
@@ -51,6 +56,7 @@ export async function getLessonInstancesByDateRange(
   from: string,
   to: string
 ): Promise<LessonInstance[]> {
+  await requireAuth();
   const rows = await db
     .select()
     .from(lessonInstances)
@@ -61,6 +67,7 @@ export async function getLessonInstancesByDateRange(
 export async function getLessonInstanceWithDetails(
   instanceId: string
 ): Promise<LessonInstanceWithDetails | null> {
+  await requireAuth();
   const [rows, resRows] = await Promise.all([
     db
       .select()
@@ -95,6 +102,7 @@ export async function getLessonInstanceWithDetails(
 }
 
 export async function cancelLessonInstance(id: string, reason: string): Promise<void> {
+  await requireAdmin();
   await db
     .update(lessonInstances)
     .set({ isCancelled: true, cancelReason: reason })
@@ -106,6 +114,7 @@ export async function generateLessonInstances(
   fromDate: Date,
   toDate: Date
 ): Promise<LessonInstance[]> {
+  await requireAdmin();
   const generated = generateInstancesForSlot(slot, fromDate, toDate);
   if (generated.length === 0) return [];
 
@@ -133,6 +142,7 @@ export async function getInstancesWithDetailsForDate(
   date: string,
   includeCancelled = false
 ): Promise<LessonInstanceWithDetails[]> {
+  await requireAuth();
   return getInstancesWithDetailsForDateRange(date, date, includeCancelled);
 }
 
@@ -141,6 +151,7 @@ export async function getInstancesWithDetailsForDateRange(
   to: string,
   includeCancelled = false
 ): Promise<LessonInstanceWithDetails[]> {
+  await requireAuth();
   const dateFilter = and(gte(lessonInstances.date, from), lte(lessonInstances.date, to));
   const rows = await db
     .select()

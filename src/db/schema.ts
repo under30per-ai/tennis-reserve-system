@@ -169,6 +169,7 @@ export const emailVerifications = pgTable('email_verifications', {
   nameKana: varchar('name_kana', { length: 255 }).notNull(),
   phone: varchar('phone', { length: 50 }).notNull(),
   password: varchar('password', { length: 255 }).notNull(),
+  attempts: integer('attempts').notNull().default(0),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });

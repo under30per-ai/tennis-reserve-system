@@ -24,8 +24,10 @@ import type {
   MemberLessonHistoryEntry,
   Reservation,
 } from '@/domain/models';
+import { requireAdmin, requireAuth } from '@/app/actions/auth';
 
 export async function getLessonRecords(): Promise<LessonRecord[]> {
+  await requireAdmin();
   const rows = await db.select().from(lessonRecords);
   return rows.map(toLessonRecord);
 }
@@ -33,6 +35,7 @@ export async function getLessonRecords(): Promise<LessonRecord[]> {
 export async function createLessonRecord(
   data: Omit<LessonRecord, 'id' | 'createdAt' | 'updatedAt'>
 ): Promise<LessonRecord> {
+  await requireAdmin();
   const existing = await db
     .select()
     .from(lessonRecords)
@@ -55,6 +58,7 @@ export async function updateLessonRecord(
   id: string,
   data: Partial<LessonRecord>
 ): Promise<LessonRecord | null> {
+  await requireAdmin();
   const values: Record<string, unknown> = { updatedAt: new Date() };
   if (data.theme !== undefined) values.theme = data.theme;
   if (data.content !== undefined) values.content = data.content;
@@ -71,6 +75,7 @@ export async function updateLessonRecord(
 export async function getLessonRecordByInstanceId(
   instanceId: string
 ): Promise<LessonRecord | null> {
+  await requireAuth();
   const rows = await db
     .select()
     .from(lessonRecords)
@@ -81,6 +86,7 @@ export async function getLessonRecordByInstanceId(
 export async function getLessonRecordWithDetails(
   id: string
 ): Promise<LessonRecordWithDetails | null> {
+  await requireAuth();
   const rows = await db
     .select()
     .from(lessonRecords)
@@ -105,6 +111,7 @@ export async function getLessonRecordWithDetails(
 export async function getMemberLessonHistory(
   memberId: string
 ): Promise<MemberLessonHistoryEntry[]> {
+  await requireAuth();
   const rows = await db
     .select()
     .from(lessonRecords)
@@ -137,6 +144,7 @@ export async function getMemberLessonHistory(
 export async function getReservationsForInstance(
   instanceId: string
 ): Promise<Reservation[]> {
+  await requireAdmin();
   const rows = await db
     .select()
     .from(reservations)

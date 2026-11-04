@@ -15,18 +15,18 @@
     "db:seed": "npx tsx src/db/seed.ts"
   },
   "dependencies": {
-    "@neon/config": "^1.8.2",
-    "@neon/env": "^1.4.7",
-    "@neondatabase/serverless": "^1.1.0",
-    "@sentry/nextjs": "^11.0.0",
+    "@neon/config": "^1.10.1",
+    "@neon/env": "^1.6.9",
+    "@neondatabase/serverless": "^1.2.0",
+    "@sentry/nextjs": "^11.10.0",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
-    "drizzle-orm": "^0.45.3",
-    "next": "16.2.11",
-    "react": "19.2.4",
-    "react-dom": "19.2.4",
-    "resend": "^6.30.0",
-    "uuid": "^14.0.1"
+    "drizzle-orm": "^0.45.4",
+    "next": "16.4.5",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "resend": "^6.37.0",
+    "uuid": "^14.0.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -34,10 +34,10 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/uuid": "^10.0.0",
-    "dotenv": "^18.0.4",
+    "dotenv": "^18.0.9",
     "drizzle-kit": "^0.31.11",
     "eslint": "^9",
-    "eslint-config-next": "16.2.11",
+    "eslint-config-next": "16.4.5",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

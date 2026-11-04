@@ -19,8 +19,10 @@ import {
 } from '@/db/mappers';
 import { eq, and, inArray } from 'drizzle-orm';
 import type { Reservation, ReservationWithDetails } from '@/domain/models';
+import { requireAuth, requireAdmin } from '@/app/actions/auth';
 
 export async function getReservations(): Promise<Reservation[]> {
+  await requireAdmin();
   const rows = await db.select().from(reservations);
   return rows.map(toReservation);
 }
@@ -29,6 +31,7 @@ export async function makeReservation(
   memberId: string,
   lessonInstanceId: string
 ): Promise<Reservation> {
+  await requireAuth();
   const instRows = await db
     .select()
     .from(lessonInstances)
@@ -76,6 +79,7 @@ export async function makeReservation(
 }
 
 export async function cancelReservation(reservationId: string): Promise<void> {
+  await requireAuth();
   const resRows = await db
     .select()
     .from(reservations)
@@ -116,6 +120,7 @@ export async function transferReservation(
   fromInstanceId: string,
   toInstanceId: string
 ): Promise<Reservation> {
+  await requireAuth();
   // Validate target instance
   const toInstRows = await db
     .select()
@@ -187,6 +192,7 @@ export async function transferReservation(
 export async function getMemberReservations(
   memberId: string
 ): Promise<ReservationWithDetails[]> {
+  await requireAuth();
   const rows = await db
     .select()
     .from(reservations)
@@ -212,6 +218,7 @@ export async function getMemberReservations(
 export async function getReservationsForInstance(
   instanceId: string
 ): Promise<Reservation[]> {
+  await requireAuth();
   const rows = await db
     .select()
     .from(reservations)
@@ -227,6 +234,7 @@ export async function getReservationsForInstance(
 export async function getAllReservationsWithDetails(): Promise<
   ReservationWithDetails[]
 > {
+  await requireAdmin();
   const rows = await db
     .select()
     .from(reservations)
