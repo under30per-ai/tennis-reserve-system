@@ -58,6 +58,42 @@ export const attendanceStatusEnum = pgEnum('attendance_status', [
 
 export const userRoleEnum = pgEnum('user_role', ['member', 'admin']);
 
+export const notificationTypeEnum = pgEnum('notification_type', [
+  'lesson_cancel',
+  'reservation_confirm',
+  'reservation_cancel',
+  'waitlist_promoted',
+  'transfer_complete',
+  'event_new',
+  'trial_approved',
+  'ticket_expiring',
+  'general',
+]);
+
+export const trialStatusEnum = pgEnum('trial_status', [
+  'pending',
+  'approved',
+  'rejected',
+  'completed',
+  'no_show',
+]);
+
+export const eventRegistrationStatusEnum = pgEnum('event_registration_status', [
+  'registered',
+  'cancelled',
+  'waitlisted',
+]);
+
+export const senderRoleEnum = pgEnum('sender_role', ['member', 'admin']);
+
+export const familyRelationshipEnum = pgEnum('family_relationship', [
+  'primary',
+  'spouse',
+  'child',
+  'parent',
+  'sibling',
+]);
+
 // ── Tables ─────────────────────────────────────────────
 
 export const members = pgTable('members', {
@@ -190,3 +226,135 @@ export const lessonRecords = pgTable('lesson_records', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+// ── Notifications ─────────────────────────────────────
+
+export const notifications = pgTable('notifications', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  memberId: uuid('member_id').notNull().references(() => members.id),
+  type: notificationTypeEnum('type').notNull(),
+  title: varchar('title', { length: 255 }).notNull(),
+  message: varchar('message', { length: 2000 }).notNull(),
+  isRead: boolean('is_read').notNull().default(false),
+  relatedId: varchar('related_id', { length: 255 }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index('idx_notifications_member_id').on(table.memberId),
+  index('idx_notifications_member_read').on(table.memberId, table.isRead),
+]);
+
+// ── Tickets ───────────────────────────────────────────
+
+export const ticketTypes = pgTable('ticket_types', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: varchar('name', { length: 255 }).notNull(),
+  description: varchar('description', { length: 2000 }).notNull().default(''),
+  lessonCount: integer('lesson_count').notNull(),
+  validDays: integer('valid_days').notNull(),
+  price: integer('price').notNull(),
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const memberTickets = pgTable('member_tickets', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  memberId: uuid('member_id').notNull().references(() => members.id),
+  ticketTypeId: uuid('ticket_type_id').notNull().references(() => ticketTypes.id),
+  remainingCount: integer('remaining_count').notNull(),
+  purchasedAt: timestamp('purchased_at', { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  isActive: boolean('is_active').notNull().default(true),
+}, (table) => [
+  index('idx_member_tickets_member_id').on(table.memberId),
+]);
+
+export const ticketUsages = pgTable('ticket_usages', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  memberTicketId: uuid('member_ticket_id').notNull().references(() => memberTickets.id),
+  reservationId: uuid('reservation_id').notNull().references(() => reservations.id),
+  usedAt: timestamp('used_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ── Trial Lessons ─────────────────────────────────────
+
+export const trialApplications = pgTable('trial_applications', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: varchar('name', { length: 255 }).notNull(),
+  nameKana: varchar('name_kana', { length: 255 }).notNull(),
+  email: varchar('email', { length: 255 }).notNull(),
+  phone: varchar('phone', { length: 50 }).notNull(),
+  preferredLevel: lessonLevelEnum('preferred_level').notNull(),
+  preferredDate: varchar('preferred_date', { length: 10 }).notNull(),
+  preferredTime: varchar('preferred_time', { length: 5 }).notNull(),
+  message: varchar('message', { length: 2000 }).notNull().default(''),
+  status: trialStatusEnum('status').notNull().default('pending'),
+  adminNotes: varchar('admin_notes', { length: 2000 }).notNull().default(''),
+  reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+// ── Events ────────────────────────────────────────────
+
+export const events = pgTable('events', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  title: varchar('title', { length: 255 }).notNull(),
+  description: varchar('description', { length: 5000 }).notNull(),
+  eventDate: varchar('event_date', { length: 10 }).notNull(),
+  startTime: varchar('start_time', { length: 5 }).notNull(),
+  endTime: varchar('end_time', { length: 5 }).notNull(),
+  courtId: uuid('court_id').references(() => courts.id),
+  maxParticipants: integer('max_participants').notNull(),
+  targetLevel: lessonLevelEnum('target_level'),
+  fee: integer('fee').notNull().default(0),
+  isPublished: boolean('is_published').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const eventRegistrations = pgTable('event_registrations', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  eventId: uuid('event_id').notNull().references(() => events.id),
+  memberId: uuid('member_id').notNull().references(() => members.id),
+  status: eventRegistrationStatusEnum('status').notNull().default('registered'),
+  registeredAt: timestamp('registered_at', { withTimezone: true }).notNull().defaultNow(),
+  cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
+  notes: varchar('notes', { length: 2000 }).notNull().default(''),
+}, (table) => [
+  index('idx_event_registrations_event_id').on(table.eventId),
+  index('idx_event_registrations_member_id').on(table.memberId),
+]);
+
+// ── Chat ──────────────────────────────────────────────
+
+export const chatMessages = pgTable('chat_messages', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  senderId: varchar('sender_id', { length: 255 }).notNull(),
+  senderRole: senderRoleEnum('sender_role').notNull(),
+  receiverId: varchar('receiver_id', { length: 255 }).notNull(),
+  message: varchar('message', { length: 5000 }).notNull(),
+  isRead: boolean('is_read').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index('idx_chat_messages_sender').on(table.senderId),
+  index('idx_chat_messages_receiver').on(table.receiverId),
+]);
+
+// ── Family Groups ─────────────────────────────────────
+
+export const familyGroups = pgTable('family_groups', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: varchar('name', { length: 255 }).notNull(),
+  primaryMemberId: uuid('primary_member_id').notNull().references(() => members.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const familyGroupMembers = pgTable('family_group_members', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  familyGroupId: uuid('family_group_id').notNull().references(() => familyGroups.id),
+  memberId: uuid('member_id').notNull().references(() => members.id),
+  relationship: familyRelationshipEnum('relationship').notNull(),
+  joinedAt: timestamp('joined_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index('idx_family_group_members_group_id').on(table.familyGroupId),
+  index('idx_family_group_members_member_id').on(table.memberId),
+]);

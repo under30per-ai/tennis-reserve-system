@@ -1,4 +1,4 @@
-import { LessonLevel, MembershipType, ReservationStatus, CourtType, CourtSurface, AttendanceStatus, RecurrenceType } from '@/types';
+import { LessonLevel, MembershipType, ReservationStatus, CourtType, CourtSurface, AttendanceStatus, RecurrenceType, NotificationType, TrialStatus, EventRegistrationStatus, FamilyRelationship } from '@/types';
 
 export const LEVEL_LABELS: Record<LessonLevel, string> = {
   beginner: '初級',
@@ -97,3 +97,45 @@ export const AVATAR_COLORS = [
   '#14B8A6', '#06B6D4', '#3B82F6', '#6366F1', '#A855F7',
   '#EC4899', '#F43F5E',
 ];
+
+export const NOTIFICATION_TYPE_LABELS: Record<NotificationType, string> = {
+  lesson_cancel: 'レッスン中止',
+  reservation_confirm: '予約確定',
+  reservation_cancel: '予約キャンセル',
+  waitlist_promoted: 'キャンセル待ち繰上げ',
+  transfer_complete: '振替完了',
+  event_new: '新規イベント',
+  trial_approved: '体験レッスン承認',
+  ticket_expiring: 'チケット期限',
+  general: 'お知らせ',
+};
+
+export const TRIAL_STATUS_LABELS: Record<TrialStatus, string> = {
+  pending: '審査待ち',
+  approved: '承認済',
+  rejected: '不承認',
+  completed: '完了',
+  no_show: '未参加',
+};
+
+export const TRIAL_STATUS_COLORS: Record<TrialStatus, { bg: string; text: string }> = {
+  pending: { bg: 'bg-yellow-100', text: 'text-yellow-800' },
+  approved: { bg: 'bg-green-100', text: 'text-green-800' },
+  rejected: { bg: 'bg-red-100', text: 'text-red-800' },
+  completed: { bg: 'bg-blue-100', text: 'text-blue-800' },
+  no_show: { bg: 'bg-gray-100', text: 'text-gray-800' },
+};
+
+export const EVENT_REGISTRATION_STATUS_LABELS: Record<EventRegistrationStatus, string> = {
+  registered: '参加登録済',
+  cancelled: 'キャンセル済',
+  waitlisted: 'キャンセル待ち',
+};
+
+export const FAMILY_RELATIONSHIP_LABELS: Record<FamilyRelationship, string> = {
+  primary: '本人',
+  spouse: '配偶者',
+  child: '子',
+  parent: '親',
+  sibling: '兄弟姉妹',
+};

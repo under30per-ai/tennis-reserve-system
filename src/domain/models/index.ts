@@ -200,3 +200,163 @@ export interface MemberLessonHistoryEntry {
   court: Court;
   memberNote: MemberLessonNote;
 }
+
+// ── Notification types ────────────────────────────────
+
+export type NotificationType =
+  | 'lesson_cancel'
+  | 'reservation_confirm'
+  | 'reservation_cancel'
+  | 'waitlist_promoted'
+  | 'transfer_complete'
+  | 'event_new'
+  | 'trial_approved'
+  | 'ticket_expiring'
+  | 'general';
+
+export interface Notification {
+  id: string;
+  memberId: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  isRead: boolean;
+  relatedId: string | null;
+  createdAt: string;
+}
+
+// ── Ticket types ──────────────────────────────────────
+
+export interface TicketType {
+  id: string;
+  name: string;
+  description: string;
+  lessonCount: number;
+  validDays: number;
+  price: number;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface MemberTicket {
+  id: string;
+  memberId: string;
+  ticketTypeId: string;
+  remainingCount: number;
+  purchasedAt: string;
+  expiresAt: string;
+  isActive: boolean;
+}
+
+export interface MemberTicketWithType extends MemberTicket {
+  ticketType: TicketType;
+}
+
+export interface TicketUsage {
+  id: string;
+  memberTicketId: string;
+  reservationId: string;
+  usedAt: string;
+}
+
+// ── Trial Lesson types ────────────────────────────────
+
+export type TrialStatus = 'pending' | 'approved' | 'rejected' | 'completed' | 'no_show';
+
+export interface TrialApplication {
+  id: string;
+  name: string;
+  nameKana: string;
+  email: string;
+  phone: string;
+  preferredLevel: LessonLevel;
+  preferredDate: string;
+  preferredTime: string;
+  message: string;
+  status: TrialStatus;
+  adminNotes: string;
+  reviewedAt: string | null;
+  createdAt: string;
+}
+
+// ── Event types ───────────────────────────────────────
+
+export type EventRegistrationStatus = 'registered' | 'cancelled' | 'waitlisted';
+
+export interface Event {
+  id: string;
+  title: string;
+  description: string;
+  eventDate: string;
+  startTime: string;
+  endTime: string;
+  courtId: string | null;
+  maxParticipants: number;
+  targetLevel: LessonLevel | null;
+  fee: number;
+  isPublished: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EventRegistration {
+  id: string;
+  eventId: string;
+  memberId: string;
+  status: EventRegistrationStatus;
+  registeredAt: string;
+  cancelledAt: string | null;
+  notes: string;
+}
+
+export interface EventWithDetails extends Event {
+  court: Court | null;
+  registrations: EventRegistration[];
+  currentParticipants: number;
+  availableSpots: number;
+}
+
+// ── Chat types ────────────────────────────────────────
+
+export type SenderRole = 'member' | 'admin';
+
+export interface ChatMessage {
+  id: string;
+  senderId: string;
+  senderRole: SenderRole;
+  receiverId: string;
+  message: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export interface ChatThread {
+  partnerId: string;
+  partnerName: string;
+  lastMessage: string;
+  lastMessageAt: string;
+  unreadCount: number;
+}
+
+// ── Family types ──────────────────────────────────────
+
+export type FamilyRelationship = 'primary' | 'spouse' | 'child' | 'parent' | 'sibling';
+
+export interface FamilyGroup {
+  id: string;
+  name: string;
+  primaryMemberId: string;
+  createdAt: string;
+}
+
+export interface FamilyGroupMember {
+  id: string;
+  familyGroupId: string;
+  memberId: string;
+  relationship: FamilyRelationship;
+  joinedAt: string;
+}
+
+export interface FamilyGroupWithMembers extends FamilyGroup {
+  members: (FamilyGroupMember & { member: Member })[];
+}
