@@ -17,7 +17,6 @@ export interface Member {
   joinDate: string;
   isActive: boolean;
   notes: string;
-  password: string;
   avatarColor: string;
   remainingTransfers: number;
   createdAt: string;

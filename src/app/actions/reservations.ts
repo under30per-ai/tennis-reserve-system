@@ -96,13 +96,18 @@ export async function makeReservation(
 }
 
 export async function cancelReservation(reservationId: string): Promise<void> {
-  await requireAuth();
+  const user = await requireAuth();
   const resRows = await db
     .select()
     .from(reservations)
     .where(eq(reservations.id, reservationId));
   if (resRows.length === 0) return;
   const reservation = toReservation(resRows[0]);
+
+  // 管理者以外は自分の予約のみキャンセル可能
+  if (user.role !== 'admin' && reservation.memberId !== user.memberId) {
+    throw new Error('権限がありません');
+  }
 
   await db
     .update(reservations)
@@ -247,7 +252,11 @@ export async function transferReservation(
 export async function getMemberReservations(
   memberId: string
 ): Promise<ReservationWithDetails[]> {
-  await requireAuth();
+  const user = await requireAuth();
+  // 管理者以外は自分の予約のみ閲覧可能
+  if (user.role !== 'admin' && user.memberId !== memberId) {
+    throw new Error('権限がありません');
+  }
   const rows = await db
     .select()
     .from(reservations)

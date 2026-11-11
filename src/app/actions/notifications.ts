@@ -34,7 +34,16 @@ export async function getUnreadCount(): Promise<number> {
 }
 
 export async function markAsRead(notificationId: string): Promise<void> {
-  await requireAuth();
+  const user = await requireAuth();
+  // 自分の通知のみ既読にできる
+  const rows = await db
+    .select()
+    .from(notifications)
+    .where(eq(notifications.id, notificationId));
+  if (rows.length === 0) return;
+  if (user.memberId !== rows[0].memberId) {
+    throw new Error('権限がありません');
+  }
   await db
     .update(notifications)
     .set({ isRead: true })

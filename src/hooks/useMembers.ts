@@ -38,7 +38,7 @@ export default function useMembers(options?: UseMembersOptions) {
   }, []);
 
   const addMember = useCallback(
-    async (data: Omit<Member, 'id' | 'createdAt' | 'updatedAt' | 'avatarColor'>) => {
+    async (data: Omit<Member, 'id' | 'createdAt' | 'updatedAt' | 'avatarColor'> & { password: string }) => {
       const member = await createMember(data);
       await refresh();
       return member;

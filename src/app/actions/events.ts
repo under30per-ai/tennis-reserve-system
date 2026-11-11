@@ -235,13 +235,18 @@ export async function registerForEvent(eventId: string): Promise<EventRegistrati
 }
 
 export async function cancelEventRegistration(registrationId: string): Promise<void> {
-  await requireAuth();
+  const user = await requireAuth();
   const regRows = await db
     .select()
     .from(eventRegistrations)
     .where(eq(eventRegistrations.id, registrationId));
   if (regRows.length === 0) return;
   const reg = toEventRegistration(regRows[0]);
+
+  // 管理者以外は自分の参加登録のみキャンセル可能
+  if (user.role !== 'admin' && user.memberId !== reg.memberId) {
+    throw new Error('権限がありません');
+  }
 
   await db
     .update(eventRegistrations)

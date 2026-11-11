@@ -128,13 +128,18 @@ export async function useTicket(
   memberTicketId: string,
   reservationId: string
 ): Promise<TicketUsage> {
-  await requireAuth();
+  const user = await requireAuth();
   const ticketRows = await db
     .select()
     .from(memberTickets)
     .where(eq(memberTickets.id, memberTicketId));
   if (ticketRows.length === 0) throw new Error('チケットが見つかりません');
   const ticket = toMemberTicket(ticketRows[0]);
+
+  // 自分のチケットのみ使用可能
+  if (user.role !== 'admin' && user.memberId !== ticket.memberId) {
+    throw new Error('権限がありません');
+  }
 
   if (!ticket.isActive) throw new Error('このチケットは無効です');
   if (ticket.remainingCount <= 0) throw new Error('チケットの残り回数がありません');
@@ -157,7 +162,16 @@ export async function useTicket(
 }
 
 export async function getTicketUsageHistory(memberTicketId: string): Promise<TicketUsage[]> {
-  await requireAuth();
+  const user = await requireAuth();
+  // チケット所有者のみ履歴閲覧可能
+  const ticketRows = await db
+    .select()
+    .from(memberTickets)
+    .where(eq(memberTickets.id, memberTicketId));
+  if (ticketRows.length === 0) throw new Error('チケットが見つかりません');
+  if (user.role !== 'admin' && user.memberId !== ticketRows[0].memberId) {
+    throw new Error('権限がありません');
+  }
   const rows = await db
     .select()
     .from(ticketUsages)

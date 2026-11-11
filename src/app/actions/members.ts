@@ -10,7 +10,7 @@ import { getRandomAvatarColor } from '@/lib/utils';
 import { sendVerificationCode } from '@/lib/email';
 import { validateEmail, validateRequired, validatePhone, validatePassword } from '@/lib/validators';
 import { hashPassword } from '@/lib/password';
-import { requireAdmin } from '@/app/actions/auth';
+import { requireAdmin, requireAuth } from '@/app/actions/auth';
 
 const MAX_OTP_ATTEMPTS = 5;
 
@@ -21,6 +21,7 @@ export async function getMembers(): Promise<Member[]> {
 }
 
 export async function getMemberById(id: string): Promise<Member | null> {
+  await requireAuth();
   const rows = await db.select().from(members).where(eq(members.id, id));
   return rows.length > 0 ? toMember(rows[0]) : null;
 }
@@ -31,7 +32,7 @@ export async function getMemberByEmail(email: string): Promise<Member | null> {
 }
 
 export async function createMember(
-  data: Omit<Member, 'id' | 'createdAt' | 'updatedAt' | 'avatarColor'>
+  data: Omit<Member, 'id' | 'createdAt' | 'updatedAt' | 'avatarColor'> & { password: string }
 ): Promise<Member> {
   const rows = await db
     .insert(members)
@@ -53,7 +54,7 @@ export async function createMember(
   return toMember(rows[0]);
 }
 
-export async function updateMember(id: string, data: Partial<Member>): Promise<Member | null> {
+export async function updateMember(id: string, data: Partial<Member> & { password?: string }): Promise<Member | null> {
   await requireAdmin();
   const values: Record<string, unknown> = { updatedAt: new Date() };
   if (data.name !== undefined) values.name = data.name;

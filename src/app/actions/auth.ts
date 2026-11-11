@@ -3,7 +3,6 @@
 import { cookies } from 'next/headers';
 import { db } from '@/db';
 import { members } from '@/db/schema';
-import { toMember } from '@/db/mappers';
 import { eq } from 'drizzle-orm';
 import type { AuthUser } from '@/domain/models';
 import { hashPassword, verifyPassword, isHashedPassword } from '@/lib/password';
@@ -43,28 +42,29 @@ export async function login(
   const rows = await db.select().from(members).where(eq(members.email, email));
   if (rows.length === 0) return null;
 
-  const member = toMember(rows[0]);
+  const row = rows[0];
+  const storedPassword = row.password;
 
   let passwordValid: boolean;
-  if (isHashedPassword(member.password)) {
-    passwordValid = await verifyPassword(password, member.password);
+  if (isHashedPassword(storedPassword)) {
+    passwordValid = await verifyPassword(password, storedPassword);
   } else {
     // Legacy plaintext comparison for migration
-    passwordValid = member.password === password;
+    passwordValid = storedPassword === password;
     if (passwordValid) {
       // Upgrade to hashed password on successful login
       const hashed = await hashPassword(password);
-      await db.update(members).set({ password: hashed, updatedAt: new Date() }).where(eq(members.id, member.id));
+      await db.update(members).set({ password: hashed, updatedAt: new Date() }).where(eq(members.id, row.id));
     }
   }
 
   if (!passwordValid) return null;
 
   const memberUser: AuthUser = {
-    id: member.id,
-    name: member.name,
+    id: row.id,
+    name: row.name,
     role: 'member',
-    memberId: member.id,
+    memberId: row.id,
   };
   await setAuthCookie(memberUser);
   return memberUser;

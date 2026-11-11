@@ -57,7 +57,6 @@ export function toMember(row: MemberRow): Member {
     joinDate: row.joinDate,
     isActive: row.isActive,
     notes: row.notes,
-    password: row.password,
     avatarColor: row.avatarColor,
     remainingTransfers: row.remainingTransfers,
     createdAt: row.createdAt.toISOString(),
