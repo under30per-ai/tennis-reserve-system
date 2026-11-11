@@ -8,68 +8,35 @@ const PUBLIC_PATHS = ['/login', '/register', '/trial'];
 // Routes that require admin authentication
 const ADMIN_PREFIX = '/admin';
 
-function base64urlDecode(str: string): string {
-  // Convert base64url to base64
-  let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
-  while (base64.length % 4) base64 += '=';
-  // atob() returns latin1 (1 byte per char) — must reinterpret as UTF-8
-  // to match Node.js Buffer.from(str).toString('base64url')
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return new TextDecoder().decode(bytes);
-}
-
-function base64urlEncode(buf: ArrayBuffer): string {
-  const bytes = new Uint8Array(buf);
-  let binary = '';
-  for (const b of bytes) binary += String.fromCharCode(b);
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-async function hmacSha256(secret: string, message: string): Promise<string> {
-  const enc = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    'raw',
-    enc.encode(secret),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-  const sig = await crypto.subtle.sign('HMAC', key, enc.encode(message));
-  return base64urlEncode(sig);
-}
-
-async function verifyAuthCookie(cookieValue: string): Promise<{ role: string; expiresAt: number } | null> {
+/**
+ * Parse the auth cookie to extract role and expiry.
+ *
+ * This does NOT verify the HMAC signature — that is the job of
+ * requireAuth() / requireAdmin() in every server action (Node.js runtime).
+ * Middleware only needs to know "is there a plausible session?" so it can
+ * redirect unauthenticated visitors for a better UX.
+ */
+function parseAuthCookie(cookieValue: string): { role: string } | null {
   try {
-    const secret = process.env.COOKIE_SECRET?.trim();
-    if (!secret) return null;
-
     const dotIndex = cookieValue.lastIndexOf('.');
     if (dotIndex === -1) return null;
 
     const encodedValue = cookieValue.slice(0, dotIndex);
-    const providedSig = cookieValue.slice(dotIndex + 1);
 
-    let value: string;
-    try {
-      value = base64urlDecode(encodedValue);
-    } catch {
-      return null;
+    // Decode base64url → raw bytes → UTF-8 string
+    let base64 = encodedValue.replace(/-/g, '+').replace(/_/g, '/');
+    while (base64.length % 4) base64 += '=';
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
     }
-
-    const expectedSig = await hmacSha256(secret, value);
-
-    // Length check for timing safety
-    if (providedSig.length !== expectedSig.length) return null;
-    if (providedSig !== expectedSig) return null;
+    const value = new TextDecoder().decode(bytes);
 
     const data = JSON.parse(value) as { user: { role: string }; expiresAt: number };
     if (Date.now() > data.expiresAt) return null;
 
-    return { role: data.user.role, expiresAt: data.expiresAt };
+    return { role: data.user.role };
   } catch {
     return null;
   }
@@ -87,7 +54,7 @@ const MEMBER_PATHS = [
   '/profile',
 ];
 
-export async function middleware(request: NextRequest) {
+export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Public routes — allow through
@@ -105,7 +72,7 @@ export async function middleware(request: NextRequest) {
   }
 
   const cookie = request.cookies.get(COOKIE_NAME);
-  const auth = cookie ? await verifyAuthCookie(cookie.value) : null;
+  const auth = cookie ? parseAuthCookie(cookie.value) : null;
 
   // Admin routes
   if (pathname.startsWith(ADMIN_PREFIX)) {
