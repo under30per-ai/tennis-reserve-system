@@ -20,6 +20,7 @@ import {
 import { eq, and, inArray } from 'drizzle-orm';
 import type { Reservation, ReservationWithDetails } from '@/domain/models';
 import { requireAuth, requireAdmin } from '@/app/actions/auth';
+import { createNotificationInternal as createNotification } from '@/app/actions/notification-helper';
 
 export async function getReservations(): Promise<Reservation[]> {
   await requireAdmin();
@@ -75,7 +76,23 @@ export async function makeReservation(
       notes: '',
     })
     .returning();
-  return toReservation(rows[0]);
+  const reservation = toReservation(rows[0]);
+
+  try {
+    if (!isWaitlisted) {
+      await createNotification(
+        memberId,
+        'reservation_confirm',
+        '予約が確定しました',
+        `${instance.date} のレッスンの予約が確定しました。`,
+        reservation.id
+      );
+    }
+  } catch {
+    // 通知失敗は予約には影響させない
+  }
+
+  return reservation;
 }
 
 export async function cancelReservation(reservationId: string): Promise<void> {
@@ -91,6 +108,18 @@ export async function cancelReservation(reservationId: string): Promise<void> {
     .update(reservations)
     .set({ status: 'cancelled', cancelledAt: new Date(), updatedAt: new Date() })
     .where(eq(reservations.id, reservationId));
+
+  try {
+    await createNotification(
+      reservation.memberId,
+      'reservation_cancel',
+      '予約がキャンセルされました',
+      '予約がキャンセルされました。',
+      reservation.id
+    );
+  } catch {
+    // 通知失敗は操作に影響させない
+  }
 
   if (reservation.status === 'confirmed') {
     const waitlistedRows = await db
@@ -111,6 +140,18 @@ export async function cancelReservation(reservationId: string): Promise<void> {
         .update(reservations)
         .set({ status: 'confirmed', waitlistPosition: null, updatedAt: new Date() })
         .where(eq(reservations.id, waitlisted[0].id));
+
+      try {
+        await createNotification(
+          waitlisted[0].memberId,
+          'waitlist_promoted',
+          'キャンセル待ちから繰上げされました',
+          'キャンセル待ちから予約が確定しました。',
+          waitlisted[0].id
+        );
+      } catch {
+        // 通知失敗は操作に影響させない
+      }
     }
   }
 }
@@ -186,7 +227,21 @@ export async function transferReservation(
     })
     .where(eq(members.id, memberId));
 
-  return toReservation(newRows[0]);
+  const newReservation = toReservation(newRows[0]);
+
+  try {
+    await createNotification(
+      memberId,
+      'transfer_complete',
+      '振替が完了しました',
+      `振替先のレッスン (${toInstance.date}) への予約が確定しました。`,
+      newReservation.id
+    );
+  } catch {
+    // 通知失敗は操作に影響させない
+  }
+
+  return newReservation;
 }
 
 export async function getMemberReservations(

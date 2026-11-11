@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import useAuth from '@/hooks/useAuth';
 import TennisBallIcon from '@/components/tennis/TennisBallIcon';
+import NotificationBell from '@/components/notifications/NotificationBell';
 import { getInitials } from '@/lib/utils';
 
 export default function MemberHeader() {
@@ -25,6 +26,7 @@ export default function MemberHeader() {
         </div>
 
         <div className="flex items-center gap-3">
+          <NotificationBell />
           {user && (
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-full bg-court-grass text-white flex items-center justify-center text-xs font-bold">

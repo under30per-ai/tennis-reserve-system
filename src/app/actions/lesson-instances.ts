@@ -7,6 +7,7 @@ import { eq, and, gte, lte, inArray } from 'drizzle-orm';
 import type { LessonInstance, LessonInstanceWithDetails, LessonSlot } from '@/domain/models';
 import { generateInstancesForSlot } from '@/lib/calendar-utils';
 import { requireAdmin, requireAuth } from '@/app/actions/auth';
+import { createNotificationInternal as createNotification } from '@/app/actions/notification-helper';
 
 export async function getLessonInstances(): Promise<LessonInstance[]> {
   await requireAuth();
@@ -107,6 +108,34 @@ export async function cancelLessonInstance(id: string, reason: string): Promise<
     .update(lessonInstances)
     .set({ isCancelled: true, cancelReason: reason })
     .where(eq(lessonInstances.id, id));
+
+  // Notify affected members
+  try {
+    const instRows = await db.select().from(lessonInstances).where(eq(lessonInstances.id, id));
+    if (instRows.length > 0) {
+      const instance = toLessonInstance(instRows[0]);
+      const resRows = await db
+        .select()
+        .from(reservations)
+        .where(
+          and(
+            eq(reservations.lessonInstanceId, id),
+            inArray(reservations.status, ['confirmed', 'waitlisted'])
+          )
+        );
+      for (const r of resRows) {
+        await createNotification(
+          r.memberId,
+          'lesson_cancel',
+          'レッスンが中止になりました',
+          `${instance.date} ${instance.startTime}〜${instance.endTime} のレッスンが中止になりました。理由: ${reason}`,
+          id
+        );
+      }
+    }
+  } catch {
+    // 通知失敗はキャンセル操作には影響させない
+  }
 }
 
 export async function generateLessonInstances(
