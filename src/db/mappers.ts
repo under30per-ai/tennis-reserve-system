@@ -27,14 +27,11 @@ import type {
   EventRegistrationStatus,
   ChatMessage,
   SenderRole,
-  FamilyGroup,
-  FamilyGroupMember,
-  FamilyRelationship,
 } from '@/domain/models';
 import type {
   members, coaches, courts, lessonSlots, lessonInstances, reservations, lessonRecords,
   notifications, ticketTypes, memberTickets, ticketUsages, trialApplications,
-  events, eventRegistrations, chatMessages, familyGroups, familyGroupMembers,
+  events, eventRegistrations, chatMessages,
 } from './schema';
 
 type MemberRow = typeof members.$inferSelect;
@@ -178,8 +175,6 @@ type TrialApplicationRow = typeof trialApplications.$inferSelect;
 type EventRow = typeof events.$inferSelect;
 type EventRegistrationRow = typeof eventRegistrations.$inferSelect;
 type ChatMessageRow = typeof chatMessages.$inferSelect;
-type FamilyGroupRow = typeof familyGroups.$inferSelect;
-type FamilyGroupMemberRow = typeof familyGroupMembers.$inferSelect;
 
 export function toNotification(row: NotificationRow): Notification {
   return {
@@ -288,21 +283,3 @@ export function toChatMessage(row: ChatMessageRow): ChatMessage {
   };
 }
 
-export function toFamilyGroup(row: FamilyGroupRow): FamilyGroup {
-  return {
-    id: row.id,
-    name: row.name,
-    primaryMemberId: row.primaryMemberId,
-    createdAt: row.createdAt.toISOString(),
-  };
-}
-
-export function toFamilyGroupMember(row: FamilyGroupMemberRow): FamilyGroupMember {
-  return {
-    id: row.id,
-    familyGroupId: row.familyGroupId,
-    memberId: row.memberId,
-    relationship: row.relationship as FamilyRelationship,
-    joinedAt: row.joinedAt.toISOString(),
-  };
-}

@@ -86,13 +86,6 @@ export const eventRegistrationStatusEnum = pgEnum('event_registration_status', [
 
 export const senderRoleEnum = pgEnum('sender_role', ['member', 'admin']);
 
-export const familyRelationshipEnum = pgEnum('family_relationship', [
-  'primary',
-  'spouse',
-  'child',
-  'parent',
-  'sibling',
-]);
 
 // ── Tables ─────────────────────────────────────────────
 
@@ -339,22 +332,3 @@ export const chatMessages = pgTable('chat_messages', {
   index('idx_chat_messages_receiver').on(table.receiverId),
 ]);
 
-// ── Family Groups ─────────────────────────────────────
-
-export const familyGroups = pgTable('family_groups', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  name: varchar('name', { length: 255 }).notNull(),
-  primaryMemberId: uuid('primary_member_id').notNull().references(() => members.id),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
-
-export const familyGroupMembers = pgTable('family_group_members', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  familyGroupId: uuid('family_group_id').notNull().references(() => familyGroups.id),
-  memberId: uuid('member_id').notNull().references(() => members.id),
-  relationship: familyRelationshipEnum('relationship').notNull(),
-  joinedAt: timestamp('joined_at', { withTimezone: true }).notNull().defaultNow(),
-}, (table) => [
-  index('idx_family_group_members_group_id').on(table.familyGroupId),
-  index('idx_family_group_members_member_id').on(table.memberId),
-]);

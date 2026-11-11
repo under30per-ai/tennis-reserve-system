@@ -1,4 +1,4 @@
-import { LessonLevel, MembershipType, ReservationStatus, CourtType, CourtSurface, AttendanceStatus, RecurrenceType, NotificationType, TrialStatus, EventRegistrationStatus, FamilyRelationship } from '@/types';
+import { LessonLevel, MembershipType, ReservationStatus, CourtType, CourtSurface, AttendanceStatus, RecurrenceType, NotificationType, TrialStatus, EventRegistrationStatus } from '@/types';
 
 export const LEVEL_LABELS: Record<LessonLevel, string> = {
   beginner: '初級',
@@ -132,10 +132,3 @@ export const EVENT_REGISTRATION_STATUS_LABELS: Record<EventRegistrationStatus, s
   waitlisted: 'キャンセル待ち',
 };
 
-export const FAMILY_RELATIONSHIP_LABELS: Record<FamilyRelationship, string> = {
-  primary: '本人',
-  spouse: '配偶者',
-  child: '子',
-  parent: '親',
-  sibling: '兄弟姉妹',
-};

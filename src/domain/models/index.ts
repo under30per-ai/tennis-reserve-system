@@ -337,25 +337,3 @@ export interface ChatThread {
   unreadCount: number;
 }
 
-// ── Family types ──────────────────────────────────────
-
-export type FamilyRelationship = 'primary' | 'spouse' | 'child' | 'parent' | 'sibling';
-
-export interface FamilyGroup {
-  id: string;
-  name: string;
-  primaryMemberId: string;
-  createdAt: string;
-}
-
-export interface FamilyGroupMember {
-  id: string;
-  familyGroupId: string;
-  memberId: string;
-  relationship: FamilyRelationship;
-  joinedAt: string;
-}
-
-export interface FamilyGroupWithMembers extends FamilyGroup {
-  members: (FamilyGroupMember & { member: Member })[];
-}
