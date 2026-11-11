@@ -75,7 +75,7 @@ export async function updateLessonRecord(
 export async function getLessonRecordByInstanceId(
   instanceId: string
 ): Promise<LessonRecord | null> {
-  await requireAuth();
+  await requireAdmin();
   const rows = await db
     .select()
     .from(lessonRecords)
@@ -86,7 +86,7 @@ export async function getLessonRecordByInstanceId(
 export async function getLessonRecordWithDetails(
   id: string
 ): Promise<LessonRecordWithDetails | null> {
-  await requireAuth();
+  await requireAdmin();
   const rows = await db
     .select()
     .from(lessonRecords)
@@ -111,7 +111,11 @@ export async function getLessonRecordWithDetails(
 export async function getMemberLessonHistory(
   memberId: string
 ): Promise<MemberLessonHistoryEntry[]> {
-  await requireAuth();
+  const user = await requireAuth();
+  // 管理者以外は自分の履歴のみ閲覧可能
+  if (user.role !== 'admin' && user.memberId !== memberId) {
+    throw new Error('権限がありません');
+  }
   const rows = await db
     .select()
     .from(lessonRecords)

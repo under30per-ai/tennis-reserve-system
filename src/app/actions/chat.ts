@@ -12,8 +12,33 @@ export async function sendMessage(
   message: string
 ): Promise<ChatMessage> {
   const user = await requireAuth();
+
+  // メッセージ長バリデーション
+  if (!message || message.trim().length === 0) {
+    throw new Error('メッセージを入力してください');
+  }
+  if (message.length > 5000) {
+    throw new Error('メッセージは5000文字以内で入力してください');
+  }
+
   const senderId = user.role === 'admin' ? 'admin' : user.memberId!;
   const senderRole: SenderRole = user.role === 'admin' ? 'admin' : 'member';
+
+  // 会員からの送信は管理者宛のみ許可
+  if (user.role !== 'admin') {
+    if (receiverId !== 'admin') {
+      throw new Error('会員同士の直接メッセージは利用できません');
+    }
+  } else {
+    // 管理者からの送信はreceiverIdがmembersテーブルに存在することを確認
+    const memberRows = await db
+      .select({ id: members.id })
+      .from(members)
+      .where(eq(members.id, receiverId));
+    if (memberRows.length === 0) {
+      throw new Error('送信先の会員が見つかりません');
+    }
+  }
 
   const rows = await db
     .insert(chatMessages)
@@ -21,7 +46,7 @@ export async function sendMessage(
       senderId,
       senderRole,
       receiverId,
-      message,
+      message: message.trim(),
     })
     .returning();
   return toChatMessage(rows[0]);
@@ -30,6 +55,11 @@ export async function sendMessage(
 export async function getConversation(partnerId: string): Promise<ChatMessage[]> {
   const user = await requireAuth();
   const myId = user.role === 'admin' ? 'admin' : user.memberId!;
+
+  // 会員は自分と管理者の会話のみ取得可能
+  if (user.role !== 'admin' && partnerId !== 'admin') {
+    throw new Error('権限がありません');
+  }
 
   const rows = await db
     .select()

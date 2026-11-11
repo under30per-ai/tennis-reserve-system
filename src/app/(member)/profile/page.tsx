@@ -14,10 +14,11 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { MEMBERSHIP_LABELS } from '@/lib/constants';
 import { formatDate, getInitials } from '@/lib/utils';
 import { Member } from '@/types';
+import { updateOwnProfile } from '@/app/actions/members';
 
 export default function ProfilePage() {
   const { user } = useAuth();
-  const { getMember, updateMember, loading } = useMembers();
+  const { getMember, loading } = useMembers();
   const toast = useToast();
 
   const [member, setMember] = useState<Member | null>(null);
@@ -33,7 +34,7 @@ export default function ProfilePage() {
 
   const handleSave = async () => {
     try {
-      await updateMember(member.id, { name: member.name, nameKana: member.nameKana, phone: member.phone });
+      await updateOwnProfile({ name: member.name, nameKana: member.nameKana, phone: member.phone });
       toast.success('プロフィールを更新しました');
       setIsEditing(false);
     } catch (err: unknown) {

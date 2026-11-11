@@ -1009,14 +1009,6 @@
         "waitlisted",
         "transferred"
       ]
-    },
-    "public.user_role": {
-      "name": "user_role",
-      "schema": "public",
-      "values": [
-        "member",
-        "admin"
-      ]
     }
   },
   "schemas": {},

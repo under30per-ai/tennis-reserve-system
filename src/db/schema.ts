@@ -8,6 +8,8 @@ import {
   jsonb,
   pgEnum,
   index,
+  uniqueIndex,
+  date,
 } from 'drizzle-orm/pg-core';
 
 // ── Enums ──────────────────────────────────────────────
@@ -56,8 +58,6 @@ export const attendanceStatusEnum = pgEnum('attendance_status', [
   'excused',
 ]);
 
-export const userRoleEnum = pgEnum('user_role', ['member', 'admin']);
-
 export const notificationTypeEnum = pgEnum('notification_type', [
   'lesson_cancel',
   'reservation_confirm',
@@ -97,7 +97,7 @@ export const members = pgTable('members', {
   phone: varchar('phone', { length: 50 }).notNull(),
   level: lessonLevelEnum('level').notNull(),
   membershipType: membershipTypeEnum('membership_type').notNull(),
-  joinDate: varchar('join_date', { length: 10 }).notNull(),
+  joinDate: date('join_date', { mode: 'string' }).notNull(),
   isActive: boolean('is_active').notNull().default(true),
   notes: varchar('notes', { length: 2000 }).notNull().default(''),
   password: varchar('password', { length: 255 }).notNull(),
@@ -143,21 +143,24 @@ export const lessonSlots = pgTable('lesson_slots', {
   maxCapacity: integer('max_capacity').notNull(),
   isRecurring: boolean('is_recurring').notNull().default(true),
   recurrenceType: recurrenceTypeEnum('recurrence_type').notNull().default('weekly'),
-  recurrenceStartDate: varchar('recurrence_start_date', { length: 10 }).notNull(),
-  recurrenceEndDate: varchar('recurrence_end_date', { length: 10 }),
-  specificDate: varchar('specific_date', { length: 10 }),
+  recurrenceStartDate: date('recurrence_start_date', { mode: 'string' }).notNull(),
+  recurrenceEndDate: date('recurrence_end_date', { mode: 'string' }),
+  specificDate: date('specific_date', { mode: 'string' }),
   monthlyWeekNumber: integer('monthly_week_number'),
   isActive: boolean('is_active').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => [
+  index('idx_lesson_slots_coach_id').on(table.coachId),
+  index('idx_lesson_slots_court_id').on(table.courtId),
+]);
 
 export const lessonInstances = pgTable('lesson_instances', {
   id: uuid('id').primaryKey().defaultRandom(),
-  lessonSlotId: uuid('lesson_slot_id').notNull().references(() => lessonSlots.id),
-  date: varchar('date', { length: 10 }).notNull(),
-  coachId: uuid('coach_id').notNull().references(() => coaches.id),
-  courtId: uuid('court_id').notNull().references(() => courts.id),
+  lessonSlotId: uuid('lesson_slot_id').notNull().references(() => lessonSlots.id, { onDelete: 'cascade' }),
+  date: date('date', { mode: 'string' }).notNull(),
+  coachId: uuid('coach_id').notNull().references(() => coaches.id, { onDelete: 'restrict' }),
+  courtId: uuid('court_id').notNull().references(() => courts.id, { onDelete: 'restrict' }),
   startTime: varchar('start_time', { length: 5 }).notNull(),
   endTime: varchar('end_time', { length: 5 }).notNull(),
   maxCapacity: integer('max_capacity').notNull(),
@@ -169,17 +172,18 @@ export const lessonInstances = pgTable('lesson_instances', {
   index('idx_lesson_instances_date').on(table.date),
   index('idx_lesson_instances_date_cancelled').on(table.date, table.isCancelled),
   index('idx_lesson_instances_lesson_slot_id').on(table.lessonSlotId),
+  uniqueIndex('idx_lesson_instances_slot_date').on(table.lessonSlotId, table.date),
 ]);
 
 export const reservations = pgTable('reservations', {
   id: uuid('id').primaryKey().defaultRandom(),
-  memberId: uuid('member_id').notNull().references(() => members.id),
-  lessonInstanceId: uuid('lesson_instance_id').notNull().references(() => lessonInstances.id),
+  memberId: uuid('member_id').notNull().references(() => members.id, { onDelete: 'cascade' }),
+  lessonInstanceId: uuid('lesson_instance_id').notNull().references(() => lessonInstances.id, { onDelete: 'cascade' }),
   status: reservationStatusEnum('status').notNull().default('confirmed'),
   reservedAt: timestamp('reserved_at', { withTimezone: true }).notNull().defaultNow(),
   cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
-  transferFromInstanceId: uuid('transfer_from_instance_id'),
-  transferToInstanceId: uuid('transfer_to_instance_id'),
+  transferFromInstanceId: uuid('transfer_from_instance_id').references(() => lessonInstances.id, { onDelete: 'set null' }),
+  transferToInstanceId: uuid('transfer_to_instance_id').references(() => lessonInstances.id, { onDelete: 'set null' }),
   waitlistPosition: integer('waitlist_position'),
   notes: varchar('notes', { length: 2000 }).notNull().default(''),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
@@ -201,7 +205,9 @@ export const emailVerifications = pgTable('email_verifications', {
   attempts: integer('attempts').notNull().default(0),
   expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => [
+  index('idx_email_verifications_email').on(table.email),
+]);
 
 export const lessonRecords = pgTable('lesson_records', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -224,7 +230,7 @@ export const lessonRecords = pgTable('lesson_records', {
 
 export const notifications = pgTable('notifications', {
   id: uuid('id').primaryKey().defaultRandom(),
-  memberId: uuid('member_id').notNull().references(() => members.id),
+  memberId: uuid('member_id').notNull().references(() => members.id, { onDelete: 'cascade' }),
   type: notificationTypeEnum('type').notNull(),
   title: varchar('title', { length: 255 }).notNull(),
   message: varchar('message', { length: 2000 }).notNull(),
@@ -251,7 +257,7 @@ export const ticketTypes = pgTable('ticket_types', {
 
 export const memberTickets = pgTable('member_tickets', {
   id: uuid('id').primaryKey().defaultRandom(),
-  memberId: uuid('member_id').notNull().references(() => members.id),
+  memberId: uuid('member_id').notNull().references(() => members.id, { onDelete: 'cascade' }),
   ticketTypeId: uuid('ticket_type_id').notNull().references(() => ticketTypes.id),
   remainingCount: integer('remaining_count').notNull(),
   purchasedAt: timestamp('purchased_at', { withTimezone: true }).notNull().defaultNow(),
@@ -266,7 +272,9 @@ export const ticketUsages = pgTable('ticket_usages', {
   memberTicketId: uuid('member_ticket_id').notNull().references(() => memberTickets.id),
   reservationId: uuid('reservation_id').notNull().references(() => reservations.id),
   usedAt: timestamp('used_at', { withTimezone: true }).notNull().defaultNow(),
-});
+}, (table) => [
+  index('idx_ticket_usages_member_ticket_id').on(table.memberTicketId),
+]);
 
 // ── Trial Lessons ─────────────────────────────────────
 
@@ -277,7 +285,7 @@ export const trialApplications = pgTable('trial_applications', {
   email: varchar('email', { length: 255 }).notNull(),
   phone: varchar('phone', { length: 50 }).notNull(),
   preferredLevel: lessonLevelEnum('preferred_level').notNull(),
-  preferredDate: varchar('preferred_date', { length: 10 }).notNull(),
+  preferredDate: date('preferred_date', { mode: 'string' }).notNull(),
   preferredTime: varchar('preferred_time', { length: 5 }).notNull(),
   message: varchar('message', { length: 2000 }).notNull().default(''),
   status: trialStatusEnum('status').notNull().default('pending'),
@@ -292,7 +300,7 @@ export const events = pgTable('events', {
   id: uuid('id').primaryKey().defaultRandom(),
   title: varchar('title', { length: 255 }).notNull(),
   description: varchar('description', { length: 5000 }).notNull(),
-  eventDate: varchar('event_date', { length: 10 }).notNull(),
+  eventDate: date('event_date', { mode: 'string' }).notNull(),
   startTime: varchar('start_time', { length: 5 }).notNull(),
   endTime: varchar('end_time', { length: 5 }).notNull(),
   courtId: uuid('court_id').references(() => courts.id),
@@ -306,8 +314,8 @@ export const events = pgTable('events', {
 
 export const eventRegistrations = pgTable('event_registrations', {
   id: uuid('id').primaryKey().defaultRandom(),
-  eventId: uuid('event_id').notNull().references(() => events.id),
-  memberId: uuid('member_id').notNull().references(() => members.id),
+  eventId: uuid('event_id').notNull().references(() => events.id, { onDelete: 'cascade' }),
+  memberId: uuid('member_id').notNull().references(() => members.id, { onDelete: 'cascade' }),
   status: eventRegistrationStatusEnum('status').notNull().default('registered'),
   registeredAt: timestamp('registered_at', { withTimezone: true }).notNull().defaultNow(),
   cancelledAt: timestamp('cancelled_at', { withTimezone: true }),
@@ -330,5 +338,6 @@ export const chatMessages = pgTable('chat_messages', {
 }, (table) => [
   index('idx_chat_messages_sender').on(table.senderId),
   index('idx_chat_messages_receiver').on(table.receiverId),
+  index('idx_chat_messages_sender_receiver').on(table.senderId, table.receiverId),
 ]);
 

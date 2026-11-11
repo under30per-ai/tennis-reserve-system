@@ -37,66 +37,71 @@ export async function makeReservation(
   if (user.role !== 'admin' && user.memberId !== memberId) {
     throw new Error('権限がありません');
   }
-  const instRows = await db
-    .select()
-    .from(lessonInstances)
-    .where(eq(lessonInstances.id, lessonInstanceId));
-  if (instRows.length === 0) throw new Error('レッスンが見つかりません');
-  const instance = toLessonInstance(instRows[0]);
 
-  if (instance.isCancelled) throw new Error('このレッスンは中止されています');
+  // トランザクション内で確認数チェック+INSERTを実行（レースコンディション対策）
+  const reservation = await db.transaction(async (tx) => {
+    const instRows = await tx
+      .select()
+      .from(lessonInstances)
+      .where(eq(lessonInstances.id, lessonInstanceId));
+    if (instRows.length === 0) throw new Error('レッスンが見つかりません');
+    const instance = toLessonInstance(instRows[0]);
 
-  const today = new Date().toISOString().slice(0, 10);
-  if (instance.date < today) throw new Error('過去のレッスンは予約できません');
+    if (instance.isCancelled) throw new Error('このレッスンは中止されています');
 
-  const existingRows = await db
-    .select()
-    .from(reservations)
-    .where(
-      and(
-        eq(reservations.lessonInstanceId, lessonInstanceId),
-        inArray(reservations.status, ['confirmed', 'waitlisted'])
-      )
-    );
-  const existing = existingRows.map(toReservation);
+    const today = new Date().toISOString().slice(0, 10);
+    if (instance.date < today) throw new Error('過去のレッスンは予約できません');
 
-  const alreadyReserved = existing.find((r) => r.memberId === memberId);
-  if (alreadyReserved) throw new Error('既に予約済みです');
+    const existingRows = await tx
+      .select()
+      .from(reservations)
+      .where(
+        and(
+          eq(reservations.lessonInstanceId, lessonInstanceId),
+          inArray(reservations.status, ['confirmed', 'waitlisted'])
+        )
+      );
+    const existing = existingRows.map(toReservation);
 
-  const confirmedCount = existing.filter((r) => r.status === 'confirmed').length;
-  const isWaitlisted = confirmedCount >= instance.maxCapacity;
-  const waitlistPosition = isWaitlisted
-    ? existing.filter((r) => r.status === 'waitlisted').length + 1
-    : null;
+    const alreadyReserved = existing.find((r) => r.memberId === memberId);
+    if (alreadyReserved) throw new Error('既に予約済みです');
 
-  const rows = await db
-    .insert(reservations)
-    .values({
-      memberId,
-      lessonInstanceId,
-      status: isWaitlisted ? 'waitlisted' : 'confirmed',
-      reservedAt: new Date(),
-      waitlistPosition,
-      notes: '',
-    })
-    .returning();
-  const reservation = toReservation(rows[0]);
+    const confirmedCount = existing.filter((r) => r.status === 'confirmed').length;
+    const isWaitlisted = confirmedCount >= instance.maxCapacity;
+    const waitlistPosition = isWaitlisted
+      ? existing.filter((r) => r.status === 'waitlisted').length + 1
+      : null;
+
+    const rows = await tx
+      .insert(reservations)
+      .values({
+        memberId,
+        lessonInstanceId,
+        status: isWaitlisted ? 'waitlisted' : 'confirmed',
+        reservedAt: new Date(),
+        waitlistPosition,
+        notes: '',
+      })
+      .returning();
+
+    return { reservation: toReservation(rows[0]), isWaitlisted, instanceDate: instance.date };
+  });
 
   try {
-    if (!isWaitlisted) {
+    if (!reservation.isWaitlisted) {
       await createNotification(
         memberId,
         'reservation_confirm',
         '予約が確定しました',
-        `${instance.date} のレッスンの予約が確定しました。`,
-        reservation.id
+        `${reservation.instanceDate} のレッスンの予約が確定しました。`,
+        reservation.reservation.id
       );
     }
   } catch {
     // 通知失敗は予約には影響させない
   }
 
-  return reservation;
+  return reservation.reservation;
 }
 
 export async function cancelReservation(reservationId: string): Promise<void> {
@@ -187,6 +192,20 @@ export async function transferReservation(
 
   const today = new Date().toISOString().slice(0, 10);
   if (toInstance.date < today) throw new Error('過去のレッスンには振替できません');
+
+  // 振替先の定員チェック
+  const toInstReservations = await db
+    .select()
+    .from(reservations)
+    .where(
+      and(
+        eq(reservations.lessonInstanceId, toInstanceId),
+        eq(reservations.status, 'confirmed')
+      )
+    );
+  if (toInstReservations.length >= toInstance.maxCapacity) {
+    throw new Error('振替先のレッスンは定員に達しています');
+  }
 
   // Validate member has transfers remaining
   const memberRows = await db
@@ -290,7 +309,7 @@ export async function getMemberReservations(
 export async function getReservationsForInstance(
   instanceId: string
 ): Promise<Reservation[]> {
-  await requireAuth();
+  await requireAdmin();
   const rows = await db
     .select()
     .from(reservations)

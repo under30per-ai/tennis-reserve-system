@@ -1,8 +1,8 @@
 'use server';
 
-import { randomInt } from 'node:crypto';
+import { randomInt, timingSafeEqual } from 'node:crypto';
 import { db } from '@/db';
-import { members, emailVerifications } from '@/db/schema';
+import { members, emailVerifications, chatMessages } from '@/db/schema';
 import { toMember } from '@/db/mappers';
 import { eq, or, ilike, and, gt } from 'drizzle-orm';
 import type { Member, LessonLevel } from '@/domain/models';
@@ -21,7 +21,11 @@ export async function getMembers(): Promise<Member[]> {
 }
 
 export async function getMemberById(id: string): Promise<Member | null> {
-  await requireAuth();
+  const user = await requireAuth();
+  // 管理者以外は自分のIDのみ取得可能
+  if (user.role !== 'admin' && user.memberId !== id) {
+    throw new Error('権限がありません');
+  }
   const rows = await db.select().from(members).where(eq(members.id, id));
   return rows.length > 0 ? toMember(rows[0]) : null;
 }
@@ -85,6 +89,12 @@ export async function updateMember(id: string, data: Partial<Member> & { passwor
 
 export async function deleteMember(id: string): Promise<void> {
   await requireAdmin();
+  // chatMessagesはvarchar型のFKのためCASCADEが効かない→手動削除
+  await db.delete(chatMessages).where(
+    or(eq(chatMessages.senderId, id), eq(chatMessages.receiverId, id))
+  );
+  // 他の関連テーブル(reservations, notifications, memberTickets, eventRegistrations)は
+  // ON DELETE CASCADEで自動削除される
   await db.delete(members).where(eq(members.id, id));
 }
 
@@ -195,7 +205,10 @@ export async function verifyEmail(data: {
     .set({ attempts: verification.attempts + 1 })
     .where(eq(emailVerifications.id, verification.id));
 
-  if (verification.code !== data.code) {
+  // Timing-safe comparison to prevent timing attacks on OTP
+  const codeBuf = Buffer.from(verification.code);
+  const inputBuf = Buffer.from(data.code.padEnd(verification.code.length));
+  if (codeBuf.length !== inputBuf.length || !timingSafeEqual(codeBuf, inputBuf)) {
     return { success: false, error: '認証コードが正しくありません。' };
   }
 
@@ -241,17 +254,11 @@ export async function resendVerificationCode(email: string): Promise<{ success: 
   const code = String(randomInt(100000, 999999));
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
-  await db.delete(emailVerifications).where(eq(emailVerifications.email, email));
-
-  await db.insert(emailVerifications).values({
-    email: verification.email,
-    code,
-    name: verification.name,
-    nameKana: verification.nameKana,
-    phone: verification.phone,
-    password: verification.password, // Already hashed
-    expiresAt,
-  });
+  // UPDATE instead of DELETE+INSERT to preserve the attempts counter
+  await db
+    .update(emailVerifications)
+    .set({ code, expiresAt })
+    .where(eq(emailVerifications.id, verification.id));
 
   await sendVerificationCode(email, code);
 
@@ -265,4 +272,27 @@ export async function getMembersByLevel(level: LessonLevel): Promise<Member[]> {
     .from(members)
     .where(eq(members.level, level));
   return rows.filter(r => r.isActive).map(toMember);
+}
+
+export async function updateOwnProfile(data: {
+  name?: string;
+  nameKana?: string;
+  phone?: string;
+}): Promise<Member | null> {
+  const user = await requireAuth();
+  if (user.role === 'admin' || !user.memberId) {
+    throw new Error('会員のみ使用可能です');
+  }
+
+  const values: Record<string, unknown> = { updatedAt: new Date() };
+  if (data.name !== undefined) values.name = data.name;
+  if (data.nameKana !== undefined) values.nameKana = data.nameKana;
+  if (data.phone !== undefined) values.phone = data.phone;
+
+  const rows = await db
+    .update(members)
+    .set(values)
+    .where(eq(members.id, user.memberId))
+    .returning();
+  return rows.length > 0 ? toMember(rows[0]) : null;
 }
