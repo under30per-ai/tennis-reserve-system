@@ -32,7 +32,11 @@ export async function makeReservation(
   memberId: string,
   lessonInstanceId: string
 ): Promise<Reservation> {
-  await requireAuth();
+  const user = await requireAuth();
+  // 管理者以外は自分の予約のみ作成可能
+  if (user.role !== 'admin' && user.memberId !== memberId) {
+    throw new Error('権限がありません');
+  }
   const instRows = await db
     .select()
     .from(lessonInstances)
@@ -166,7 +170,11 @@ export async function transferReservation(
   fromInstanceId: string,
   toInstanceId: string
 ): Promise<Reservation> {
-  await requireAuth();
+  const user = await requireAuth();
+  // 管理者以外は自分の振替のみ実行可能
+  if (user.role !== 'admin' && user.memberId !== memberId) {
+    throw new Error('権限がありません');
+  }
   // Validate target instance
   const toInstRows = await db
     .select()

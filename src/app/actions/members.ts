@@ -26,12 +26,14 @@ export async function getMemberById(id: string): Promise<Member | null> {
   return rows.length > 0 ? toMember(rows[0]) : null;
 }
 
-export async function getMemberByEmail(email: string): Promise<Member | null> {
+// Internal helper — not exported as a server action
+async function getMemberByEmailInternal(email: string): Promise<Member | null> {
   const rows = await db.select().from(members).where(eq(members.email, email));
   return rows.length > 0 ? toMember(rows[0]) : null;
 }
 
-export async function createMember(
+// Internal helper — not exported as a server action
+async function createMemberInternal(
   data: Omit<Member, 'id' | 'createdAt' | 'updatedAt' | 'avatarColor'> & { password: string }
 ): Promise<Member> {
   const rows = await db
@@ -52,6 +54,13 @@ export async function createMember(
     })
     .returning();
   return toMember(rows[0]);
+}
+
+export async function createMember(
+  data: Omit<Member, 'id' | 'createdAt' | 'updatedAt' | 'avatarColor'> & { password: string }
+): Promise<Member> {
+  await requireAdmin();
+  return createMemberInternal(data);
 }
 
 export async function updateMember(id: string, data: Partial<Member> & { password?: string }): Promise<Member | null> {
@@ -118,7 +127,7 @@ export async function registerMember(data: {
   const passwordError = validatePassword(data.password);
   if (passwordError) return { success: false, error: passwordError };
 
-  const existing = await getMemberByEmail(data.email);
+  const existing = await getMemberByEmailInternal(data.email);
   if (existing) {
     return { success: false, error: 'このメールアドレスは既に登録されています' };
   }
@@ -191,14 +200,14 @@ export async function verifyEmail(data: {
   }
 
   // Check if email was registered while verifying
-  const existingMember = await getMemberByEmail(data.email);
+  const existingMember = await getMemberByEmailInternal(data.email);
   if (existingMember) {
     await db.delete(emailVerifications).where(eq(emailVerifications.email, data.email));
     return { success: false, error: 'このメールアドレスは既に登録されています' };
   }
 
   const today = new Date().toISOString().slice(0, 10);
-  const member = await createMember({
+  const member = await createMemberInternal({
     name: verification.name,
     nameKana: verification.nameKana,
     email: verification.email,
@@ -250,6 +259,7 @@ export async function resendVerificationCode(email: string): Promise<{ success: 
 }
 
 export async function getMembersByLevel(level: LessonLevel): Promise<Member[]> {
+  await requireAuth();
   const rows = await db
     .select()
     .from(members)

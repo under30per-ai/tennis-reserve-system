@@ -14,6 +14,7 @@ import {
   parseISO,
 } from 'date-fns';
 import { v4 as uuidv4 } from 'uuid';
+import { hashPassword } from '../lib/password';
 
 const sql = neon(process.env.DATABASE_URL!);
 const db = drizzle(sql, { schema });
@@ -149,7 +150,7 @@ async function seed() {
     { name: '後藤 慎一', kana: 'ゴトウ シンイチ', level: 'beginner' as const, type: 'regular' as const },
   ];
 
-  const memberData = names.map((n, i) => ({
+  const memberData = await Promise.all(names.map(async (n, i) => ({
     id: uuidv4(),
     name: n.name,
     nameKana: n.kana,
@@ -160,10 +161,10 @@ async function seed() {
     joinDate: '2024-04-01',
     isActive: true,
     notes: '',
-    password: i === 0 ? 'member' : 'password',
+    password: await hashPassword(i === 0 ? 'member' : 'password'),
     avatarColor: colors[i % colors.length],
     remainingTransfers: 3,
-  }));
+  })));
   await db.insert(schema.members).values(memberData);
   const demoMemberId = memberData[0].id;
   console.log(`  Inserted ${memberData.length} members (demo: ${memberData[0].email})`);
