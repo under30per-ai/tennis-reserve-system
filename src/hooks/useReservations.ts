@@ -24,7 +24,8 @@ export default function useReservations() {
   const makeReservation = useCallback(
     async (memberId: string, lessonInstanceId: string): Promise<Reservation> => {
       const reservation = await makeReservationAction(memberId, lessonInstanceId);
-      await refresh();
+      // refresh() は admin専用の getReservations() を呼ぶため、会員操作では呼ばない
+      try { await refresh(); } catch { /* 会員の場合は権限エラーになるため無視 */ }
       return reservation;
     },
     [refresh]
@@ -33,7 +34,7 @@ export default function useReservations() {
   const cancelReservation = useCallback(
     async (reservationId: string) => {
       await cancelReservationAction(reservationId);
-      await refresh();
+      try { await refresh(); } catch { /* 会員の場合は権限エラーになるため無視 */ }
     },
     [refresh]
   );
@@ -49,7 +50,7 @@ export default function useReservations() {
         fromInstanceId,
         toInstanceId
       );
-      await refresh();
+      try { await refresh(); } catch { /* 会員の場合は権限エラーになるため無視 */ }
       return newReservation;
     },
     [refresh]
