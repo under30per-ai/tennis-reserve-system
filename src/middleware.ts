@@ -12,7 +12,14 @@ function base64urlDecode(str: string): string {
   // Convert base64url to base64
   let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
   while (base64.length % 4) base64 += '=';
-  return atob(base64);
+  // atob() returns latin1 (1 byte per char) — must reinterpret as UTF-8
+  // to match Node.js Buffer.from(str).toString('base64url')
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return new TextDecoder().decode(bytes);
 }
 
 function base64urlEncode(buf: ArrayBuffer): string {
