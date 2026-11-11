@@ -207,6 +207,21 @@ export async function transferReservation(
     throw new Error('振替先のレッスンは定員に達しています');
   }
 
+  // 振替先に既に予約済みかチェック
+  const existingToRes = await db
+    .select()
+    .from(reservations)
+    .where(
+      and(
+        eq(reservations.memberId, memberId),
+        eq(reservations.lessonInstanceId, toInstanceId),
+        inArray(reservations.status, ['confirmed', 'waitlisted'])
+      )
+    );
+  if (existingToRes.length > 0) {
+    throw new Error('振替先のレッスンは既に予約済みです');
+  }
+
   // Validate member has transfers remaining
   const memberRows = await db
     .select()
@@ -215,6 +230,7 @@ export async function transferReservation(
   if (memberRows.length === 0) throw new Error('会員情報が見つかりません');
   if (memberRows[0].remainingTransfers <= 0) throw new Error('振替回数の上限に達しています');
 
+  // 振替元の予約を取得
   const allRes = await db
     .select()
     .from(reservations)
@@ -228,16 +244,18 @@ export async function transferReservation(
     .map(toReservation)
     .find((r) => r.status === 'confirmed' || r.status === 'cancelled');
 
-  if (original) {
-    await db
-      .update(reservations)
-      .set({
-        status: 'transferred',
-        transferToInstanceId: toInstanceId,
-        updatedAt: new Date(),
-      })
-      .where(eq(reservations.id, original.id));
+  if (!original) {
+    throw new Error('振替元の予約が見つかりません');
   }
+
+  await db
+    .update(reservations)
+    .set({
+      status: 'transferred',
+      transferToInstanceId: toInstanceId,
+      updatedAt: new Date(),
+    })
+    .where(eq(reservations.id, original.id));
 
   const newRows = await db
     .insert(reservations)
