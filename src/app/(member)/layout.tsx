@@ -7,6 +7,7 @@ import MemberHeader from '@/components/layout/MemberHeader';
 import MemberNav from '@/components/layout/MemberNav';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { MemberDataProvider } from '@/contexts/MemberDataContext';
+import { CartProvider } from '@/contexts/CartContext';
 
 export default function MemberLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, user, loading } = useAuth();
@@ -47,14 +48,16 @@ export default function MemberLayout({ children }: { children: React.ReactNode }
       <div ref={topRef} />
       <MemberHeader />
       <MemberDataProvider>
-        <div className="flex flex-1">
-          <MemberNav />
-          <main className="flex-1 min-w-0 pb-20 sm:pb-0">
-            <div className="max-w-5xl mx-auto px-4 py-6 overflow-x-hidden">
-              {children}
-            </div>
-          </main>
-        </div>
+        <CartProvider>
+          <div className="flex flex-1">
+            <MemberNav />
+            <main className="flex-1 min-w-0 pb-20 sm:pb-0">
+              <div className="max-w-5xl mx-auto px-4 py-6 overflow-x-hidden">
+                {children}
+              </div>
+            </main>
+          </div>
+        </CartProvider>
       </MemberDataProvider>
     </div>
   );

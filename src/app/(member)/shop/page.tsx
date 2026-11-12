@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import useShop from '@/hooks/useShop';
 import Card from '@/components/ui/Card';
 import EmptyState from '@/components/ui/EmptyState';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import CartFloatingButton from '@/components/shop/CartFloatingButton';
 import { PRODUCT_CATEGORY_LABELS, PRODUCT_CATEGORY_COLORS } from '@/lib/constants';
 import type { ProductCategory } from '@/types';
 
@@ -17,7 +19,7 @@ const categories: { key: string; label: string }[] = [
 ];
 
 export default function ShopCatalogPage() {
-  const { products, loading, loadProducts } = useShop();
+  const { products, loading, loadProducts, cartItemCount } = useShop();
   const router = useRouter();
   const [category, setCategory] = useState('all');
 
@@ -29,7 +31,24 @@ export default function ShopCatalogPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-lg font-bold text-net-dark">ショップ</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-lg font-bold text-net-dark">ショップ</h1>
+        <div className="flex items-center gap-3">
+          <Link href="/shop/cart" className="relative text-gray-500 hover:text-net-gray transition-colors">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+            </svg>
+            {cartItemCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                {cartItemCount > 99 ? '99' : cartItemCount}
+              </span>
+            )}
+          </Link>
+          <Link href="/shop/orders" className="text-sm text-gray-500 hover:text-net-gray transition-colors">
+            注文履歴
+          </Link>
+        </div>
+      </div>
 
       <div className="flex gap-2 flex-wrap">
         {categories.map((c) => (
@@ -79,6 +98,8 @@ export default function ShopCatalogPage() {
           })}
         </div>
       )}
+
+      <CartFloatingButton />
     </div>
   );
 }

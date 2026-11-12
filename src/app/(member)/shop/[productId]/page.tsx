@@ -7,6 +7,7 @@ import useToast from '@/hooks/useToast';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import CartFloatingButton from '@/components/shop/CartFloatingButton';
 import { PRODUCT_CATEGORY_LABELS, PRODUCT_CATEGORY_COLORS } from '@/lib/constants';
 import type { Product, ProductCategory } from '@/types';
 
@@ -106,6 +107,8 @@ export default function ProductDetailPage() {
           </div>
         )}
       </Card>
+
+      <CartFloatingButton />
     </div>
   );
 }

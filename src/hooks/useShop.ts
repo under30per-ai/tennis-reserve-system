@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import type { Product, ShopOrder, ShopOrderItem, ProductCategory, PaymentMethod } from '@/types';
+import { useCart } from '@/contexts/CartContext';
 import {
   getActiveProducts,
   getProductDetail,
@@ -11,16 +12,20 @@ import {
   cancelMyShopOrder,
 } from '@/app/actions/shop';
 
-interface CartItem {
-  product: Product;
-  quantity: number;
-}
-
 export default function useShop() {
   const [products, setProducts] = useState<Product[]>([]);
   const [myOrders, setMyOrders] = useState<ShopOrder[]>([]);
-  const [cart, setCart] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(false);
+
+  const {
+    cart,
+    cartTotal,
+    cartItemCount,
+    addToCart,
+    updateCartQuantity,
+    removeFromCart,
+    clearCart,
+  } = useCart();
 
   const loadProducts = useCallback(async (category?: ProductCategory) => {
     setLoading(true);
@@ -36,47 +41,6 @@ export default function useShop() {
     return getProductDetail(id);
   }, []);
 
-  const addToCart = useCallback((product: Product, quantity: number = 1) => {
-    setCart((prev) => {
-      const existing = prev.find((item) => item.product.id === product.id);
-      if (existing) {
-        return prev.map((item) =>
-          item.product.id === product.id
-            ? { ...item, quantity: item.quantity + quantity }
-            : item
-        );
-      }
-      return [...prev, { product, quantity }];
-    });
-  }, []);
-
-  const updateCartQuantity = useCallback((productId: string, quantity: number) => {
-    if (quantity <= 0) {
-      setCart((prev) => prev.filter((item) => item.product.id !== productId));
-      return;
-    }
-    setCart((prev) =>
-      prev.map((item) =>
-        item.product.id === productId ? { ...item, quantity } : item
-      )
-    );
-  }, []);
-
-  const removeFromCart = useCallback((productId: string) => {
-    setCart((prev) => prev.filter((item) => item.product.id !== productId));
-  }, []);
-
-  const clearCart = useCallback(() => {
-    setCart([]);
-  }, []);
-
-  const cartTotal = cart.reduce(
-    (sum, item) => sum + item.product.price * item.quantity,
-    0
-  );
-
-  const cartItemCount = cart.reduce((sum, item) => sum + item.quantity, 0);
-
   const checkout = useCallback(
     async (paymentMethod: PaymentMethod, notes?: string) => {
       const items = cart.map((item) => ({
@@ -84,10 +48,10 @@ export default function useShop() {
         quantity: item.quantity,
       }));
       const order = await createShopOrder({ items, paymentMethod, notes });
-      setCart([]);
+      clearCart();
       return order;
     },
-    [cart]
+    [cart, clearCart]
   );
 
   const loadMyOrders = useCallback(async () => {
