@@ -27,11 +27,20 @@ import type {
   EventRegistrationStatus,
   ChatMessage,
   SenderRole,
+  Product,
+  ProductCategory,
+  ShopOrder,
+  ShopOrderStatus,
+  PaymentMethod,
+  PaymentStatus,
+  OrderSource,
+  ShopOrderItem,
 } from '@/domain/models';
 import type {
   members, coaches, courts, lessonSlots, lessonInstances, reservations, lessonRecords,
   notifications, ticketTypes, memberTickets, ticketUsages, trialApplications,
   events, eventRegistrations, chatMessages,
+  products, shopOrders, shopOrderItems,
 } from './schema';
 
 type MemberRow = typeof members.$inferSelect;
@@ -279,6 +288,62 @@ export function toChatMessage(row: ChatMessageRow): ChatMessage {
     receiverId: row.receiverId,
     message: row.message,
     isRead: row.isRead,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+// ── Shop mappers ──────────────────────────────────────
+
+type ProductRow = typeof products.$inferSelect;
+type ShopOrderRow = typeof shopOrders.$inferSelect;
+type ShopOrderItemRow = typeof shopOrderItems.$inferSelect;
+
+export function toProduct(row: ProductRow): Product {
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description,
+    category: row.category as ProductCategory,
+    price: row.price,
+    stock: row.stock,
+    sku: row.sku ?? null,
+    barcode: row.barcode ?? null,
+    imageUrl: row.imageUrl ?? null,
+    isActive: row.isActive,
+    displayOrder: row.displayOrder,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+export function toShopOrder(row: ShopOrderRow): ShopOrder {
+  return {
+    id: row.id,
+    memberId: row.memberId,
+    orderNumber: row.orderNumber,
+    status: row.status as ShopOrderStatus,
+    paymentMethod: row.paymentMethod as PaymentMethod,
+    paymentStatus: row.paymentStatus as PaymentStatus,
+    subtotal: row.subtotal,
+    tax: row.tax,
+    totalAmount: row.totalAmount,
+    notes: row.notes,
+    orderSource: row.orderSource as OrderSource,
+    posTransactionId: row.posTransactionId ?? null,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+export function toShopOrderItem(row: ShopOrderItemRow): ShopOrderItem {
+  return {
+    id: row.id,
+    orderId: row.orderId,
+    productId: row.productId,
+    productName: row.productName,
+    unitPrice: row.unitPrice,
+    quantity: row.quantity,
+    subtotal: row.subtotal,
     createdAt: row.createdAt.toISOString(),
   };
 }

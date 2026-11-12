@@ -86,6 +86,39 @@ export const eventRegistrationStatusEnum = pgEnum('event_registration_status', [
 
 export const senderRoleEnum = pgEnum('sender_role', ['member', 'admin']);
 
+export const productCategoryEnum = pgEnum('product_category', [
+  'racket',
+  'shoe',
+  'apparel',
+  'ball',
+  'accessory',
+  'string',
+]);
+
+export const shopOrderStatusEnum = pgEnum('shop_order_status', [
+  'pending',
+  'confirmed',
+  'paid',
+  'shipped',
+  'completed',
+  'cancelled',
+]);
+
+export const paymentMethodEnum = pgEnum('payment_method', [
+  'cash',
+  'credit_card',
+  'transfer',
+  'mock',
+]);
+
+export const paymentStatusEnum = pgEnum('payment_status', [
+  'unpaid',
+  'paid',
+  'refunded',
+]);
+
+export const orderSourceEnum = pgEnum('order_source', ['online', 'pos']);
+
 
 // ── Tables ─────────────────────────────────────────────
 
@@ -371,5 +404,63 @@ export const chatMessages = pgTable('chat_messages', {
   index('idx_chat_messages_sender').on(table.senderId),
   index('idx_chat_messages_receiver').on(table.receiverId),
   index('idx_chat_messages_sender_receiver').on(table.senderId, table.receiverId),
+]);
+
+// ── Shop ──────────────────────────────────────────────
+
+export const products = pgTable('products', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: varchar('name', { length: 255 }).notNull(),
+  description: varchar('description', { length: 5000 }).notNull().default(''),
+  category: productCategoryEnum('category').notNull(),
+  price: integer('price').notNull(),
+  stock: integer('stock').notNull().default(0),
+  sku: varchar('sku', { length: 100 }),
+  barcode: varchar('barcode', { length: 100 }),
+  imageUrl: varchar('image_url', { length: 2000 }),
+  isActive: boolean('is_active').notNull().default(true),
+  displayOrder: integer('display_order').notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index('idx_products_category').on(table.category),
+  index('idx_products_sku').on(table.sku),
+  index('idx_products_is_active').on(table.isActive),
+]);
+
+export const shopOrders = pgTable('shop_orders', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  memberId: uuid('member_id').notNull().references(() => members.id),
+  orderNumber: varchar('order_number', { length: 20 }).notNull().unique(),
+  status: shopOrderStatusEnum('status').notNull().default('pending'),
+  paymentMethod: paymentMethodEnum('payment_method').notNull().default('mock'),
+  paymentStatus: paymentStatusEnum('payment_status').notNull().default('unpaid'),
+  subtotal: integer('subtotal').notNull(),
+  tax: integer('tax').notNull(),
+  totalAmount: integer('total_amount').notNull(),
+  notes: varchar('notes', { length: 2000 }).notNull().default(''),
+  orderSource: orderSourceEnum('order_source').notNull().default('online'),
+  posTransactionId: varchar('pos_transaction_id', { length: 255 }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index('idx_shop_orders_member_id').on(table.memberId),
+  index('idx_shop_orders_status').on(table.status),
+  index('idx_shop_orders_order_number').on(table.orderNumber),
+  index('idx_shop_orders_created_at').on(table.createdAt),
+]);
+
+export const shopOrderItems = pgTable('shop_order_items', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  orderId: uuid('order_id').notNull().references(() => shopOrders.id, { onDelete: 'cascade' }),
+  productId: uuid('product_id').notNull().references(() => products.id),
+  productName: varchar('product_name', { length: 255 }).notNull(),
+  unitPrice: integer('unit_price').notNull(),
+  quantity: integer('quantity').notNull(),
+  subtotal: integer('subtotal').notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index('idx_shop_order_items_order_id').on(table.orderId),
+  index('idx_shop_order_items_product_id').on(table.productId),
 ]);
 

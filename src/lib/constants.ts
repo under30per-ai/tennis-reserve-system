@@ -1,4 +1,4 @@
-import { LessonLevel, MembershipType, ReservationStatus, CourtType, CourtSurface, AttendanceStatus, RecurrenceType, NotificationType, TrialStatus, EventRegistrationStatus } from '@/types';
+import { LessonLevel, MembershipType, ReservationStatus, CourtType, CourtSurface, AttendanceStatus, RecurrenceType, NotificationType, TrialStatus, EventRegistrationStatus, ProductCategory, ShopOrderStatus, PaymentMethod, PaymentStatus, OrderSource } from '@/types';
 
 export const LEVEL_LABELS: Record<LessonLevel, string> = {
   beginner: '初級',
@@ -131,4 +131,62 @@ export const EVENT_REGISTRATION_STATUS_LABELS: Record<EventRegistrationStatus, s
   cancelled: 'キャンセル済',
   waitlisted: 'キャンセル待ち',
 };
+
+// ── Shop constants ────────────────────────────────────
+
+export const PRODUCT_CATEGORY_LABELS: Record<ProductCategory, string> = {
+  racket: 'ラケット',
+  shoe: 'シューズ',
+  apparel: 'ウェア',
+  ball: 'ボール',
+  accessory: 'アクセサリー',
+  string: 'ストリング',
+};
+
+export const PRODUCT_CATEGORY_COLORS: Record<ProductCategory, { bg: string; text: string }> = {
+  racket: { bg: 'bg-blue-100', text: 'text-blue-800' },
+  shoe: { bg: 'bg-green-100', text: 'text-green-800' },
+  apparel: { bg: 'bg-purple-100', text: 'text-purple-800' },
+  ball: { bg: 'bg-yellow-100', text: 'text-yellow-800' },
+  accessory: { bg: 'bg-pink-100', text: 'text-pink-800' },
+  string: { bg: 'bg-orange-100', text: 'text-orange-800' },
+};
+
+export const SHOP_ORDER_STATUS_LABELS: Record<ShopOrderStatus, string> = {
+  pending: '注文受付',
+  confirmed: '確認済',
+  paid: '支払済',
+  shipped: '発送済',
+  completed: '完了',
+  cancelled: 'キャンセル',
+};
+
+export const SHOP_ORDER_STATUS_COLORS: Record<ShopOrderStatus, { bg: string; text: string }> = {
+  pending: { bg: 'bg-yellow-100', text: 'text-yellow-800' },
+  confirmed: { bg: 'bg-blue-100', text: 'text-blue-800' },
+  paid: { bg: 'bg-green-100', text: 'text-green-800' },
+  shipped: { bg: 'bg-indigo-100', text: 'text-indigo-800' },
+  completed: { bg: 'bg-gray-100', text: 'text-gray-800' },
+  cancelled: { bg: 'bg-red-100', text: 'text-red-800' },
+};
+
+export const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
+  cash: '現金',
+  credit_card: 'クレジットカード',
+  transfer: '銀行振込',
+  mock: 'モック決済',
+};
+
+export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
+  unpaid: '未払い',
+  paid: '支払済',
+  refunded: '返金済',
+};
+
+export const ORDER_SOURCE_LABELS: Record<OrderSource, string> = {
+  online: 'オンライン',
+  pos: 'POS',
+};
+
+export const TAX_RATE = 0.10;
 

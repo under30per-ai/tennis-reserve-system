@@ -337,3 +337,60 @@ export interface ChatThread {
   unreadCount: number;
 }
 
+// ── Shop types ────────────────────────────────────────
+
+export type ProductCategory = 'racket' | 'shoe' | 'apparel' | 'ball' | 'accessory' | 'string';
+export type ShopOrderStatus = 'pending' | 'confirmed' | 'paid' | 'shipped' | 'completed' | 'cancelled';
+export type PaymentMethod = 'cash' | 'credit_card' | 'transfer' | 'mock';
+export type PaymentStatus = 'unpaid' | 'paid' | 'refunded';
+export type OrderSource = 'online' | 'pos';
+
+export interface Product {
+  id: string;
+  name: string;
+  description: string;
+  category: ProductCategory;
+  price: number;
+  stock: number;
+  sku: string | null;
+  barcode: string | null;
+  imageUrl: string | null;
+  isActive: boolean;
+  displayOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ShopOrder {
+  id: string;
+  memberId: string;
+  orderNumber: string;
+  status: ShopOrderStatus;
+  paymentMethod: PaymentMethod;
+  paymentStatus: PaymentStatus;
+  subtotal: number;
+  tax: number;
+  totalAmount: number;
+  notes: string;
+  orderSource: OrderSource;
+  posTransactionId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ShopOrderItem {
+  id: string;
+  orderId: string;
+  productId: string;
+  productName: string;
+  unitPrice: number;
+  quantity: number;
+  subtotal: number;
+  createdAt: string;
+}
+
+export interface ShopOrderWithItems extends ShopOrder {
+  items: ShopOrderItem[];
+  memberName: string;
+}
+
