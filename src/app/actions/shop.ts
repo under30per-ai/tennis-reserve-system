@@ -23,7 +23,7 @@ import { TAX_RATE } from '@/lib/constants';
 // ── Admin: Products ───────────────────────────────────
 
 export async function getProducts(): Promise<Product[]> {
-  await requireAuth();
+  await requireAdmin();
   const rows = await db
     .select()
     .from(products)
@@ -33,7 +33,7 @@ export async function getProducts(): Promise<Product[]> {
 }
 
 export async function getProductById(id: string): Promise<Product | null> {
-  await requireAuth();
+  await requireAdmin();
   const rows = await db.select().from(products).where(eq(products.id, id));
   return rows.length > 0 ? toProduct(rows[0]) : null;
 }
@@ -180,28 +180,32 @@ export async function updateShopOrderStatus(
     if (data.status !== undefined) values.status = data.status;
     if (data.paymentStatus !== undefined) values.paymentStatus = data.paymentStatus;
 
-    // キャンセル時は在庫を戻す
-    if (data.status === 'cancelled' && existing[0].status !== 'cancelled') {
-      const itemRows = await db
-        .select()
-        .from(shopOrderItems)
-        .where(eq(shopOrderItems.orderId, id));
-      for (const item of itemRows) {
-        await db
-          .update(products)
-          .set({ stock: sql`${products.stock} + ${item.quantity}` })
-          .where(eq(products.id, item.productId));
+    const result = await db.transaction(async (tx) => {
+      // キャンセル時は在庫を戻す
+      if (data.status === 'cancelled' && existing[0].status !== 'cancelled') {
+        const itemRows = await tx
+          .select()
+          .from(shopOrderItems)
+          .where(eq(shopOrderItems.orderId, id));
+        for (const item of itemRows) {
+          await tx
+            .update(products)
+            .set({ stock: sql`${products.stock} + ${item.quantity}` })
+            .where(eq(products.id, item.productId));
+        }
       }
-    }
 
-    const rows = await db
-      .update(shopOrders)
-      .set(values)
-      .where(eq(shopOrders.id, id))
-      .returning();
-    if (rows.length === 0) return null;
+      const rows = await tx
+        .update(shopOrders)
+        .set(values)
+        .where(eq(shopOrders.id, id))
+        .returning();
+      return rows;
+    });
+
+    if (result.length === 0) return null;
     await writeAuditLog({ actorId: 'admin', action: 'update_status', targetType: 'shop_order', targetId: id });
-    return toShopOrder(rows[0]);
+    return toShopOrder(result[0]);
   });
 }
 
@@ -261,43 +265,51 @@ export async function createShopOrder(data: {
   const user = await requireAuth();
   if (!user.memberId) throw new Error('会員情報が見つかりません');
   if (data.items.length === 0) throw new Error('商品が選択されていません');
+  if (data.items.length > 50) throw new Error('一度に注文できる商品は50種類までです');
 
-  // 在庫確認
-  const productIds = data.items.map((i) => i.productId);
-  const productRows = await db
-    .select()
-    .from(products)
-    .where(sql`${products.id} = ANY(${productIds})`);
-  const productMap = new Map(productRows.map((p) => [p.id, p]));
-
+  // 数量バリデーション
   for (const item of data.items) {
-    const product = productMap.get(item.productId);
-    if (!product) throw new Error('商品が見つかりません');
-    if (!product.isActive) throw new Error(`「${product.name}」は現在販売していません`);
-    if (product.stock < item.quantity) throw new Error(`「${product.name}」の在庫が不足しています（残り${product.stock}点）`);
+    if (!Number.isInteger(item.quantity) || item.quantity < 1) {
+      throw new Error('数量は1以上の整数を指定してください');
+    }
   }
 
-  const orderNumber = await generateOrderNumber();
-
-  // 小計計算
-  let subtotal = 0;
-  const orderItems = data.items.map((item) => {
-    const product = productMap.get(item.productId)!;
-    const itemSubtotal = product.price * item.quantity;
-    subtotal += itemSubtotal;
-    return {
-      productId: item.productId,
-      productName: product.name,
-      unitPrice: product.price,
-      quantity: item.quantity,
-      subtotal: itemSubtotal,
-    };
-  });
-
-  const tax = Math.floor(subtotal * TAX_RATE);
-  const totalAmount = subtotal + tax;
-
   const result = await db.transaction(async (tx) => {
+    // 在庫確認（トランザクション内で行いレースコンディションを防止）
+    const productIds = data.items.map((i) => i.productId);
+    const productRows = await tx
+      .select()
+      .from(products)
+      .where(sql`${products.id} = ANY(${productIds})`);
+    const productMap = new Map(productRows.map((p) => [p.id, p]));
+
+    for (const item of data.items) {
+      const product = productMap.get(item.productId);
+      if (!product) throw new Error('商品が見つかりません');
+      if (!product.isActive) throw new Error(`「${product.name}」は現在販売していません`);
+      if (product.stock < item.quantity) throw new Error(`「${product.name}」の在庫が不足しています（残り${product.stock}点）`);
+    }
+
+    const orderNumber = await generateOrderNumber();
+
+    // 小計計算
+    let subtotal = 0;
+    const orderItems = data.items.map((item) => {
+      const product = productMap.get(item.productId)!;
+      const itemSubtotal = product.price * item.quantity;
+      subtotal += itemSubtotal;
+      return {
+        productId: item.productId,
+        productName: product.name,
+        unitPrice: product.price,
+        quantity: item.quantity,
+        subtotal: itemSubtotal,
+      };
+    });
+
+    const tax = Math.floor(subtotal * TAX_RATE);
+    const totalAmount = subtotal + tax;
+
     // 注文作成
     const orderRows = await tx
       .insert(shopOrders)
@@ -310,7 +322,7 @@ export async function createShopOrder(data: {
         subtotal,
         tax,
         totalAmount,
-        notes: data.notes ?? '',
+        notes: (data.notes ?? '').slice(0, 2000),
         orderSource: 'online',
       })
       .returning();
@@ -324,12 +336,16 @@ export async function createShopOrder(data: {
       });
     }
 
-    // 在庫減少
+    // 在庫減少（stock >= quantity を条件に含め、負の在庫を防止）
     for (const item of data.items) {
-      await tx
+      const updated = await tx
         .update(products)
         .set({ stock: sql`${products.stock} - ${item.quantity}` })
-        .where(eq(products.id, item.productId));
+        .where(and(eq(products.id, item.productId), sql`${products.stock} >= ${item.quantity}`))
+        .returning();
+      if (updated.length === 0) {
+        throw new Error('在庫が不足しています。再度お試しください。');
+      }
     }
 
     return order;
