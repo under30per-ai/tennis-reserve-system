@@ -3,7 +3,7 @@
 import { db } from '@/db';
 import { products, shopOrders, shopOrderItems, members } from '@/db/schema';
 import { toProduct, toShopOrder, toShopOrderItem } from '@/db/mappers';
-import { eq, and, desc, sql } from 'drizzle-orm';
+import { eq, and, desc, sql, inArray } from 'drizzle-orm';
 import type {
   Product,
   ProductCategory,
@@ -130,14 +130,14 @@ export async function getShopOrders(): Promise<ShopOrderWithItems[]> {
   const itemRows = await db
     .select()
     .from(shopOrderItems)
-    .where(sql`${shopOrderItems.orderId} = ANY(${orderIds})`);
+    .where(inArray(shopOrderItems.orderId, orderIds));
   const allItems = itemRows.map(toShopOrderItem);
 
   const memberIds = [...new Set(orders.map((o) => o.memberId))];
   const memberRows = await db
     .select({ id: members.id, name: members.name })
     .from(members)
-    .where(sql`${members.id} = ANY(${memberIds})`);
+    .where(inArray(members.id, memberIds));
   const memberMap = new Map(memberRows.map((m) => [m.id, m.name]));
 
   return orders.map((order) => ({
@@ -276,7 +276,7 @@ export async function createShopOrder(data: {
   const productRows = await db
     .select()
     .from(products)
-    .where(sql`${products.id} = ANY(${productIds})`);
+    .where(inArray(products.id, productIds));
   const productMap = new Map(productRows.map((p) => [p.id, p]));
 
   for (const item of data.items) {
