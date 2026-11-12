@@ -5,9 +5,10 @@ import { events, eventRegistrations, courts, members } from '@/db/schema';
 import { toEvent, toEventRegistration, toCourt } from '@/db/mappers';
 import { eq, and, desc, gte, inArray } from 'drizzle-orm';
 import type { Event, EventRegistration, EventWithDetails, LessonLevel } from '@/domain/models';
-import { requireAdmin, requireAuth } from '@/app/actions/auth';
+import { requireAuth } from '@/app/actions/auth';
+import { withAdminWrite } from '@/app/actions/admin-guard';
 import { createNotificationInternal as createNotification } from '@/app/actions/notification-helper';
-import { checkAdminWriteLimit } from '@/lib/rate-limit';
+import { buildPartialUpdate } from '@/lib/db-utils';
 import { writeAuditLog } from '@/lib/audit-log';
 
 // ── Admin CRUD ────────────────────────────────────────
@@ -36,31 +37,36 @@ export async function createEvent(data: {
   fee: number;
   isPublished: boolean;
 }): Promise<Event> {
-  await requireAdmin();
-  await checkAdminWriteLimit();
-  const rows = await db
-    .insert(events)
-    .values({
-      title: data.title,
-      description: data.description,
-      eventDate: data.eventDate,
-      startTime: data.startTime,
-      endTime: data.endTime,
-      courtId: data.courtId ?? null,
-      maxParticipants: data.maxParticipants,
-      targetLevel: data.targetLevel ?? null,
-      fee: data.fee,
-      isPublished: data.isPublished,
-    })
-    .returning();
-  const event = toEvent(rows[0]);
+  return withAdminWrite(async () => {
+    const rows = await db
+      .insert(events)
+      .values({
+        title: data.title,
+        description: data.description,
+        eventDate: data.eventDate,
+        startTime: data.startTime,
+        endTime: data.endTime,
+        courtId: data.courtId ?? null,
+        maxParticipants: data.maxParticipants,
+        targetLevel: data.targetLevel ?? null,
+        fee: data.fee,
+        isPublished: data.isPublished,
+      })
+      .returning();
+    const event = toEvent(rows[0]);
 
-  if (data.isPublished) {
-    await notifyAllMembersAboutEvent(event);
-  }
+    if (data.isPublished) {
+      await notifyAllMembersAboutEvent(event);
+    }
 
-  return event;
+    return event;
+  });
 }
+
+const EVENT_UPDATE_KEYS = [
+  'title', 'description', 'eventDate', 'startTime', 'endTime',
+  'courtId', 'maxParticipants', 'targetLevel', 'fee', 'isPublished',
+] as const;
 
 export async function updateEvent(
   id: string,
@@ -77,52 +83,41 @@ export async function updateEvent(
     isPublished: boolean;
   }>
 ): Promise<Event | null> {
-  await requireAdmin();
-  await checkAdminWriteLimit();
-
-  // Check if we need to notify (publishing for first time)
-  let shouldNotify = false;
-  if (data.isPublished === true) {
-    const existing = await db.select().from(events).where(eq(events.id, id));
-    if (existing.length > 0 && !existing[0].isPublished) {
-      shouldNotify = true;
+  return withAdminWrite(async () => {
+    // Check if we need to notify (publishing for first time)
+    let shouldNotify = false;
+    if (data.isPublished === true) {
+      const existing = await db.select().from(events).where(eq(events.id, id));
+      if (existing.length > 0 && !existing[0].isPublished) {
+        shouldNotify = true;
+      }
     }
-  }
 
-  const values: Record<string, unknown> = { updatedAt: new Date() };
-  if (data.title !== undefined) values.title = data.title;
-  if (data.description !== undefined) values.description = data.description;
-  if (data.eventDate !== undefined) values.eventDate = data.eventDate;
-  if (data.startTime !== undefined) values.startTime = data.startTime;
-  if (data.endTime !== undefined) values.endTime = data.endTime;
-  if (data.courtId !== undefined) values.courtId = data.courtId;
-  if (data.maxParticipants !== undefined) values.maxParticipants = data.maxParticipants;
-  if (data.targetLevel !== undefined) values.targetLevel = data.targetLevel;
-  if (data.fee !== undefined) values.fee = data.fee;
-  if (data.isPublished !== undefined) values.isPublished = data.isPublished;
+    const values = buildPartialUpdate(data, EVENT_UPDATE_KEYS, { updatedAt: new Date() });
 
-  const rows = await db
-    .update(events)
-    .set(values)
-    .where(eq(events.id, id))
-    .returning();
+    const rows = await db
+      .update(events)
+      .set(values)
+      .where(eq(events.id, id))
+      .returning();
 
-  if (rows.length === 0) return null;
-  const event = toEvent(rows[0]);
+    if (rows.length === 0) return null;
+    const event = toEvent(rows[0]);
 
-  if (shouldNotify) {
-    await notifyAllMembersAboutEvent(event);
-  }
+    if (shouldNotify) {
+      await notifyAllMembersAboutEvent(event);
+    }
 
-  return event;
+    return event;
+  });
 }
 
 export async function deleteEvent(id: string): Promise<void> {
-  await requireAdmin();
-  await checkAdminWriteLimit();
-  await db.delete(eventRegistrations).where(eq(eventRegistrations.eventId, id));
-  await db.delete(events).where(eq(events.id, id));
-  await writeAuditLog({ actorId: 'admin', action: 'delete', targetType: 'event', targetId: id });
+  return withAdminWrite(async () => {
+    await db.delete(eventRegistrations).where(eq(eventRegistrations.eventId, id));
+    await db.delete(events).where(eq(events.id, id));
+    await writeAuditLog({ actorId: 'admin', action: 'delete', targetType: 'event', targetId: id });
+  });
 }
 
 // ── Event details with registrations ──────────────────

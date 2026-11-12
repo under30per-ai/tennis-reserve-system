@@ -7,9 +7,10 @@ import { eq, and, gte, lte, inArray } from 'drizzle-orm';
 import type { LessonInstance, LessonInstanceWithDetails, LessonSlot } from '@/domain/models';
 import { generateInstancesForSlot } from '@/lib/calendar-utils';
 import { validateDateString } from '@/lib/validators';
-import { requireAdmin, requireAuth } from '@/app/actions/auth';
+import { requireAuth } from '@/app/actions/auth';
+import { withAdminWrite } from '@/app/actions/admin-guard';
 import { createNotificationInternal as createNotification } from '@/app/actions/notification-helper';
-import { checkAdminWriteLimit } from '@/lib/rate-limit';
+import { buildPartialUpdate } from '@/lib/db-utils';
 import { writeAuditLog } from '@/lib/audit-log';
 
 export async function getLessonInstances(): Promise<LessonInstance[]> {
@@ -24,28 +25,24 @@ export async function getLessonInstanceById(id: string): Promise<LessonInstance 
   return rows.length > 0 ? toLessonInstance(rows[0]) : null;
 }
 
+const LESSON_INSTANCE_UPDATE_KEYS = [
+  'coachId', 'courtId', 'startTime', 'endTime',
+  'maxCapacity', 'isCancelled', 'cancelReason', 'notes',
+] as const;
+
 export async function updateLessonInstance(
   id: string,
   data: Partial<LessonInstance>
 ): Promise<LessonInstance | null> {
-  await requireAdmin();
-  await checkAdminWriteLimit();
-  const values: Record<string, unknown> = {};
-  if (data.coachId !== undefined) values.coachId = data.coachId;
-  if (data.courtId !== undefined) values.courtId = data.courtId;
-  if (data.startTime !== undefined) values.startTime = data.startTime;
-  if (data.endTime !== undefined) values.endTime = data.endTime;
-  if (data.maxCapacity !== undefined) values.maxCapacity = data.maxCapacity;
-  if (data.isCancelled !== undefined) values.isCancelled = data.isCancelled;
-  if (data.cancelReason !== undefined) values.cancelReason = data.cancelReason;
-  if (data.notes !== undefined) values.notes = data.notes;
-
-  const rows = await db
-    .update(lessonInstances)
-    .set(values)
-    .where(eq(lessonInstances.id, id))
-    .returning();
-  return rows.length > 0 ? toLessonInstance(rows[0]) : null;
+  return withAdminWrite(async () => {
+    const values = buildPartialUpdate(data, LESSON_INSTANCE_UPDATE_KEYS);
+    const rows = await db
+      .update(lessonInstances)
+      .set(values)
+      .where(eq(lessonInstances.id, id))
+      .returning();
+    return rows.length > 0 ? toLessonInstance(rows[0]) : null;
+  });
 }
 
 export async function getLessonInstancesByDate(date: string): Promise<LessonInstance[]> {
@@ -110,8 +107,7 @@ export async function getLessonInstanceWithDetails(
 }
 
 export async function cancelLessonInstance(id: string, reason: string): Promise<void> {
-  await requireAdmin();
-  await checkAdminWriteLimit();
+  return withAdminWrite(async () => {
   await writeAuditLog({ actorId: 'admin', action: 'cancel', targetType: 'lessonInstance', targetId: id, details: `レッスンキャンセル: ${reason}` });
   await db
     .update(lessonInstances)
@@ -145,6 +141,7 @@ export async function cancelLessonInstance(id: string, reason: string): Promise<
   } catch {
     // 通知失敗はキャンセル操作には影響させない
   }
+  });
 }
 
 export async function generateLessonInstances(
@@ -152,8 +149,7 @@ export async function generateLessonInstances(
   fromDate: Date,
   toDate: Date
 ): Promise<LessonInstance[]> {
-  await requireAdmin();
-  await checkAdminWriteLimit();
+  return withAdminWrite(async () => {
   const generated = generateInstancesForSlot(slot, fromDate, toDate);
   if (generated.length === 0) return [];
 
@@ -175,6 +171,7 @@ export async function generateLessonInstances(
     )
     .returning();
   return rows.map(toLessonInstance);
+  });
 }
 
 export async function getInstancesWithDetailsForDate(

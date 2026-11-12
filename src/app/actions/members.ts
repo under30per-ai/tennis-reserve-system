@@ -10,9 +10,11 @@ import { getRandomAvatarColor } from '@/lib/utils';
 import { sendVerificationCode } from '@/lib/email';
 import { validateEmail, validateRequired, validatePhone, validatePassword } from '@/lib/validators';
 import { hashPassword } from '@/lib/password';
-import { checkRateLimit, checkAdminWriteLimit } from '@/lib/rate-limit';
+import { checkRateLimit } from '@/lib/rate-limit';
 import { writeAuditLog } from '@/lib/audit-log';
 import { requireAdmin, requireAuth } from '@/app/actions/auth';
+import { withAdminWrite } from '@/app/actions/admin-guard';
+import { buildPartialUpdate } from '@/lib/db-utils';
 import { unstable_cache, revalidateTag } from 'next/cache';
 
 const MAX_OTP_ATTEMPTS = 5;
@@ -88,49 +90,44 @@ async function createMemberInternal(
 export async function createMember(
   data: Omit<Member, 'id' | 'createdAt' | 'updatedAt' | 'avatarColor'> & { password: string }
 ): Promise<Member> {
-  await requireAdmin();
-  await checkAdminWriteLimit();
-  const member = await createMemberInternal(data);
-  await writeAuditLog({ actorId: 'admin', action: 'create', targetType: 'member', targetId: member.id, details: `会員作成: ${data.name}` });
-  return member;
+  return withAdminWrite(async () => {
+    const member = await createMemberInternal(data);
+    await writeAuditLog({ actorId: 'admin', action: 'create', targetType: 'member', targetId: member.id, details: `会員作成: ${data.name}` });
+    return member;
+  });
 }
 
-export async function updateMember(id: string, data: Partial<Member> & { password?: string }): Promise<Member | null> {
-  await requireAdmin();
-  await checkAdminWriteLimit();
-  const values: Record<string, unknown> = { updatedAt: new Date() };
-  if (data.name !== undefined) values.name = data.name;
-  if (data.nameKana !== undefined) values.nameKana = data.nameKana;
-  if (data.email !== undefined) values.email = data.email;
-  if (data.phone !== undefined) values.phone = data.phone;
-  if (data.level !== undefined) values.level = data.level;
-  if (data.membershipType !== undefined) values.membershipType = data.membershipType;
-  if (data.joinDate !== undefined) values.joinDate = data.joinDate;
-  if (data.isActive !== undefined) values.isActive = data.isActive;
-  if (data.notes !== undefined) values.notes = data.notes;
-  if (data.password !== undefined) values.password = await hashPassword(data.password);
-  if (data.avatarColor !== undefined) values.avatarColor = data.avatarColor;
-  if (data.remainingTransfers !== undefined) values.remainingTransfers = data.remainingTransfers;
+const MEMBER_UPDATE_KEYS = [
+  'name', 'nameKana', 'email', 'phone', 'level',
+  'membershipType', 'joinDate', 'isActive', 'notes',
+  'avatarColor', 'remainingTransfers',
+] as const;
 
-  const rows = await db.update(members).set(values).where(eq(members.id, id)).returning();
-  revalidateTag(`member:${id}`, 'max');
-  if (rows.length > 0) {
-    await writeAuditLog({ actorId: 'admin', action: 'update', targetType: 'member', targetId: id, details: `会員更新: ${Object.keys(values).join(', ')}` });
-  }
-  return rows.length > 0 ? toMember(rows[0]) : null;
+export async function updateMember(id: string, data: Partial<Member> & { password?: string }): Promise<Member | null> {
+  return withAdminWrite(async () => {
+    const values = buildPartialUpdate(data, MEMBER_UPDATE_KEYS, { updatedAt: new Date() });
+    if (data.password !== undefined) values.password = await hashPassword(data.password);
+
+    const rows = await db.update(members).set(values).where(eq(members.id, id)).returning();
+    revalidateTag(`member:${id}`, 'max');
+    if (rows.length > 0) {
+      await writeAuditLog({ actorId: 'admin', action: 'update', targetType: 'member', targetId: id, details: `会員更新: ${Object.keys(values).join(', ')}` });
+    }
+    return rows.length > 0 ? toMember(rows[0]) : null;
+  });
 }
 
 export async function deleteMember(id: string): Promise<void> {
-  await requireAdmin();
-  await checkAdminWriteLimit();
-  // chatMessagesはvarchar型のFKのためCASCADEが効かない→手動削除
-  await db.delete(chatMessages).where(
-    or(eq(chatMessages.senderId, id), eq(chatMessages.receiverId, id))
-  );
-  // 他の関連テーブル(reservations, notifications, memberTickets, eventRegistrations)は
-  // ON DELETE CASCADEで自動削除される
-  await db.delete(members).where(eq(members.id, id));
-  await writeAuditLog({ actorId: 'admin', action: 'delete', targetType: 'member', targetId: id });
+  return withAdminWrite(async () => {
+    // chatMessagesはvarchar型のFKのためCASCADEが効かない→手動削除
+    await db.delete(chatMessages).where(
+      or(eq(chatMessages.senderId, id), eq(chatMessages.receiverId, id))
+    );
+    // 他の関連テーブル(reservations, notifications, memberTickets, eventRegistrations)は
+    // ON DELETE CASCADEで自動削除される
+    await db.delete(members).where(eq(members.id, id));
+    await writeAuditLog({ actorId: 'admin', action: 'delete', targetType: 'member', targetId: id });
+  });
 }
 
 export async function searchMembers(query: string): Promise<Member[]> {

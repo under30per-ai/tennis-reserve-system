@@ -25,7 +25,8 @@ import type {
   Reservation,
 } from '@/domain/models';
 import { requireAdmin, requireAuth } from '@/app/actions/auth';
-import { checkAdminWriteLimit } from '@/lib/rate-limit';
+import { withAdminWrite } from '@/app/actions/admin-guard';
+import { buildPartialUpdate } from '@/lib/db-utils';
 
 export async function getLessonRecords(): Promise<LessonRecord[]> {
   await requireAdmin();
@@ -36,43 +37,41 @@ export async function getLessonRecords(): Promise<LessonRecord[]> {
 export async function createLessonRecord(
   data: Omit<LessonRecord, 'id' | 'createdAt' | 'updatedAt'>
 ): Promise<LessonRecord> {
-  await requireAdmin();
-  await checkAdminWriteLimit();
-  const existing = await db
-    .select()
-    .from(lessonRecords)
-    .where(eq(lessonRecords.lessonInstanceId, data.lessonInstanceId));
-  if (existing.length > 0) throw new Error('このレッスンの記録は既に存在します');
+  return withAdminWrite(async () => {
+    const existing = await db
+      .select()
+      .from(lessonRecords)
+      .where(eq(lessonRecords.lessonInstanceId, data.lessonInstanceId));
+    if (existing.length > 0) throw new Error('このレッスンの記録は既に存在します');
 
-  const rows = await db
-    .insert(lessonRecords)
-    .values({
-      lessonInstanceId: data.lessonInstanceId,
-      theme: data.theme,
-      content: data.content,
-      memberNotes: data.memberNotes,
-    })
-    .returning();
-  return toLessonRecord(rows[0]);
+    const rows = await db
+      .insert(lessonRecords)
+      .values({
+        lessonInstanceId: data.lessonInstanceId,
+        theme: data.theme,
+        content: data.content,
+        memberNotes: data.memberNotes,
+      })
+      .returning();
+    return toLessonRecord(rows[0]);
+  });
 }
+
+const LESSON_RECORD_UPDATE_KEYS = ['theme', 'content', 'memberNotes'] as const;
 
 export async function updateLessonRecord(
   id: string,
   data: Partial<LessonRecord>
 ): Promise<LessonRecord | null> {
-  await requireAdmin();
-  await checkAdminWriteLimit();
-  const values: Record<string, unknown> = { updatedAt: new Date() };
-  if (data.theme !== undefined) values.theme = data.theme;
-  if (data.content !== undefined) values.content = data.content;
-  if (data.memberNotes !== undefined) values.memberNotes = data.memberNotes;
-
-  const rows = await db
-    .update(lessonRecords)
-    .set(values)
-    .where(eq(lessonRecords.id, id))
-    .returning();
-  return rows.length > 0 ? toLessonRecord(rows[0]) : null;
+  return withAdminWrite(async () => {
+    const values = buildPartialUpdate(data, LESSON_RECORD_UPDATE_KEYS, { updatedAt: new Date() });
+    const rows = await db
+      .update(lessonRecords)
+      .set(values)
+      .where(eq(lessonRecords.id, id))
+      .returning();
+    return rows.length > 0 ? toLessonRecord(rows[0]) : null;
+  });
 }
 
 export async function getLessonRecordByInstanceId(

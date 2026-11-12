@@ -5,8 +5,9 @@ import { courts } from '@/db/schema';
 import { toCourt } from '@/db/mappers';
 import { eq } from 'drizzle-orm';
 import type { Court } from '@/domain/models';
-import { requireAdmin, requireAuth } from '@/app/actions/auth';
-import { checkAdminWriteLimit } from '@/lib/rate-limit';
+import { requireAuth } from '@/app/actions/auth';
+import { withAdminWrite } from '@/app/actions/admin-guard';
+import { buildPartialUpdate } from '@/lib/db-utils';
 
 export async function getCourts(): Promise<Court[]> {
   await requireAuth();
@@ -21,37 +22,33 @@ export async function getCourtById(id: string): Promise<Court | null> {
 }
 
 export async function createCourt(data: Omit<Court, 'id'>): Promise<Court> {
-  await requireAdmin();
-  await checkAdminWriteLimit();
-  const rows = await db
-    .insert(courts)
-    .values({
-      name: data.name,
-      type: data.type,
-      surface: data.surface,
-      capacity: data.capacity,
-      isActive: data.isActive,
-    })
-    .returning();
-  return toCourt(rows[0]);
+  return withAdminWrite(async () => {
+    const rows = await db
+      .insert(courts)
+      .values({
+        name: data.name,
+        type: data.type,
+        surface: data.surface,
+        capacity: data.capacity,
+        isActive: data.isActive,
+      })
+      .returning();
+    return toCourt(rows[0]);
+  });
 }
 
-export async function updateCourt(id: string, data: Partial<Court>): Promise<Court | null> {
-  await requireAdmin();
-  await checkAdminWriteLimit();
-  const values: Record<string, unknown> = {};
-  if (data.name !== undefined) values.name = data.name;
-  if (data.type !== undefined) values.type = data.type;
-  if (data.surface !== undefined) values.surface = data.surface;
-  if (data.capacity !== undefined) values.capacity = data.capacity;
-  if (data.isActive !== undefined) values.isActive = data.isActive;
+const COURT_UPDATE_KEYS = ['name', 'type', 'surface', 'capacity', 'isActive'] as const;
 
-  const rows = await db.update(courts).set(values).where(eq(courts.id, id)).returning();
-  return rows.length > 0 ? toCourt(rows[0]) : null;
+export async function updateCourt(id: string, data: Partial<Court>): Promise<Court | null> {
+  return withAdminWrite(async () => {
+    const values = buildPartialUpdate(data, COURT_UPDATE_KEYS);
+    const rows = await db.update(courts).set(values).where(eq(courts.id, id)).returning();
+    return rows.length > 0 ? toCourt(rows[0]) : null;
+  });
 }
 
 export async function deleteCourt(id: string): Promise<void> {
-  await requireAdmin();
-  await checkAdminWriteLimit();
-  await db.delete(courts).where(eq(courts.id, id));
+  return withAdminWrite(async () => {
+    await db.delete(courts).where(eq(courts.id, id));
+  });
 }

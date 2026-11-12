@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
-import { Coach } from '@/types';
+import { useCRUD } from '@/hooks/useCRUD';
+import type { Coach } from '@/types';
 import {
-  getCoaches as fetchCoaches,
+  getCoaches,
   getCoachById,
   createCoach,
   updateCoach as updateCoachAction,
@@ -11,51 +11,25 @@ import {
 } from '@/app/actions/coaches';
 
 export default function useCoaches() {
-  const [coaches, setCoaches] = useState<Coach[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { items, loading, refresh, getById, add, update, remove } = useCRUD<
+    Coach,
+    Omit<Coach, 'id' | 'createdAt' | 'updatedAt' | 'avatarColor'>,
+    Partial<Coach>
+  >({
+    getAll: getCoaches,
+    getById: getCoachById,
+    create: createCoach,
+    update: updateCoachAction,
+    remove: deleteCoachAction,
+  });
 
-  const refresh = useCallback(async () => {
-    const data = await fetchCoaches();
-    setCoaches(data);
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    fetchCoaches().then(data => {
-      setCoaches(data);
-      setLoading(false);
-    });
-  }, []);
-
-  const getCoach = useCallback(async (id: string) => {
-    return getCoachById(id);
-  }, []);
-
-  const addCoach = useCallback(
-    async (data: Omit<Coach, 'id' | 'createdAt' | 'updatedAt' | 'avatarColor'>) => {
-      const coach = await createCoach(data);
-      await refresh();
-      return coach;
-    },
-    [refresh]
-  );
-
-  const updateCoach = useCallback(
-    async (id: string, data: Partial<Coach>) => {
-      const result = await updateCoachAction(id, data);
-      await refresh();
-      return result;
-    },
-    [refresh]
-  );
-
-  const deleteCoach = useCallback(
-    async (id: string) => {
-      await deleteCoachAction(id);
-      await refresh();
-    },
-    [refresh]
-  );
-
-  return { coaches, loading, getCoach, addCoach, updateCoach, deleteCoach, refresh };
+  return {
+    coaches: items,
+    loading,
+    getCoach: getById!,
+    addCoach: add!,
+    updateCoach: update!,
+    deleteCoach: remove!,
+    refresh,
+  };
 }

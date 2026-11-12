@@ -5,8 +5,9 @@ import { lessonSlots } from '@/db/schema';
 import { toLessonSlot } from '@/db/mappers';
 import { eq } from 'drizzle-orm';
 import type { LessonSlot } from '@/domain/models';
-import { requireAdmin, requireAuth } from '@/app/actions/auth';
-import { checkAdminWriteLimit } from '@/lib/rate-limit';
+import { requireAuth } from '@/app/actions/auth';
+import { withAdminWrite } from '@/app/actions/admin-guard';
+import { buildPartialUpdate } from '@/lib/db-utils';
 
 export async function getLessonSlots(): Promise<LessonSlot[]> {
   await requireAuth();
@@ -23,60 +24,50 @@ export async function getLessonSlotById(id: string): Promise<LessonSlot | null> 
 export async function createLessonSlot(
   data: Omit<LessonSlot, 'id' | 'createdAt' | 'updatedAt'>
 ): Promise<LessonSlot> {
-  await requireAdmin();
-  await checkAdminWriteLimit();
-  const rows = await db
-    .insert(lessonSlots)
-    .values({
-      title: data.title,
-      level: data.level,
-      coachId: data.coachId,
-      courtId: data.courtId,
-      dayOfWeek: data.dayOfWeek,
-      startTime: data.startTime,
-      endTime: data.endTime,
-      maxCapacity: data.maxCapacity,
-      isRecurring: data.isRecurring,
-      recurrenceType: data.recurrenceType,
-      recurrenceStartDate: data.recurrenceStartDate,
-      recurrenceEndDate: data.recurrenceEndDate,
-      specificDate: data.specificDate,
-      monthlyWeekNumber: data.monthlyWeekNumber,
-      isActive: data.isActive,
-    })
-    .returning();
-  return toLessonSlot(rows[0]);
+  return withAdminWrite(async () => {
+    const rows = await db
+      .insert(lessonSlots)
+      .values({
+        title: data.title,
+        level: data.level,
+        coachId: data.coachId,
+        courtId: data.courtId,
+        dayOfWeek: data.dayOfWeek,
+        startTime: data.startTime,
+        endTime: data.endTime,
+        maxCapacity: data.maxCapacity,
+        isRecurring: data.isRecurring,
+        recurrenceType: data.recurrenceType,
+        recurrenceStartDate: data.recurrenceStartDate,
+        recurrenceEndDate: data.recurrenceEndDate,
+        specificDate: data.specificDate,
+        monthlyWeekNumber: data.monthlyWeekNumber,
+        isActive: data.isActive,
+      })
+      .returning();
+    return toLessonSlot(rows[0]);
+  });
 }
+
+const LESSON_SLOT_UPDATE_KEYS = [
+  'title', 'level', 'coachId', 'courtId', 'dayOfWeek',
+  'startTime', 'endTime', 'maxCapacity', 'isRecurring', 'recurrenceType',
+  'recurrenceStartDate', 'recurrenceEndDate', 'specificDate', 'monthlyWeekNumber', 'isActive',
+] as const;
 
 export async function updateLessonSlot(
   id: string,
   data: Partial<LessonSlot>
 ): Promise<LessonSlot | null> {
-  await requireAdmin();
-  await checkAdminWriteLimit();
-  const values: Record<string, unknown> = { updatedAt: new Date() };
-  if (data.title !== undefined) values.title = data.title;
-  if (data.level !== undefined) values.level = data.level;
-  if (data.coachId !== undefined) values.coachId = data.coachId;
-  if (data.courtId !== undefined) values.courtId = data.courtId;
-  if (data.dayOfWeek !== undefined) values.dayOfWeek = data.dayOfWeek;
-  if (data.startTime !== undefined) values.startTime = data.startTime;
-  if (data.endTime !== undefined) values.endTime = data.endTime;
-  if (data.maxCapacity !== undefined) values.maxCapacity = data.maxCapacity;
-  if (data.isRecurring !== undefined) values.isRecurring = data.isRecurring;
-  if (data.recurrenceType !== undefined) values.recurrenceType = data.recurrenceType;
-  if (data.recurrenceStartDate !== undefined) values.recurrenceStartDate = data.recurrenceStartDate;
-  if (data.recurrenceEndDate !== undefined) values.recurrenceEndDate = data.recurrenceEndDate;
-  if (data.specificDate !== undefined) values.specificDate = data.specificDate;
-  if (data.monthlyWeekNumber !== undefined) values.monthlyWeekNumber = data.monthlyWeekNumber;
-  if (data.isActive !== undefined) values.isActive = data.isActive;
-
-  const rows = await db.update(lessonSlots).set(values).where(eq(lessonSlots.id, id)).returning();
-  return rows.length > 0 ? toLessonSlot(rows[0]) : null;
+  return withAdminWrite(async () => {
+    const values = buildPartialUpdate(data, LESSON_SLOT_UPDATE_KEYS, { updatedAt: new Date() });
+    const rows = await db.update(lessonSlots).set(values).where(eq(lessonSlots.id, id)).returning();
+    return rows.length > 0 ? toLessonSlot(rows[0]) : null;
+  });
 }
 
 export async function deleteLessonSlot(id: string): Promise<void> {
-  await requireAdmin();
-  await checkAdminWriteLimit();
-  await db.delete(lessonSlots).where(eq(lessonSlots.id, id));
+  return withAdminWrite(async () => {
+    await db.delete(lessonSlots).where(eq(lessonSlots.id, id));
+  });
 }

@@ -1,75 +1,38 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
-import { LessonSlot } from '@/types';
+import { useCRUD } from '@/hooks/useCRUD';
+import type { LessonSlot } from '@/types';
 import {
-  getLessonSlots as fetchLessonSlots,
+  getLessonSlots,
   getLessonSlotById,
   createLessonSlot,
   updateLessonSlot as updateLessonSlotAction,
   deleteLessonSlot as deleteLessonSlotAction,
 } from '@/app/actions/lesson-slots';
 
-interface UseLessonSlotsOptions {
-  eagerLoad?: boolean;
-}
-
-export default function useLessonSlots(options?: UseLessonSlotsOptions) {
-  const eagerLoad = options?.eagerLoad ?? false;
-  const [lessonSlots, setLessonSlots] = useState<LessonSlot[]>([]);
-  const [loading, setLoading] = useState(eagerLoad);
-
-  const refresh = useCallback(async () => {
-    const data = await fetchLessonSlots();
-    setLessonSlots(data);
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    if (!eagerLoad) return;
-    fetchLessonSlots().then(data => {
-      setLessonSlots(data);
-      setLoading(false);
-    });
-  }, [eagerLoad]);
-
-  const getLessonSlot = useCallback(async (id: string) => {
-    return getLessonSlotById(id);
-  }, []);
-
-  const addLessonSlot = useCallback(
-    async (data: Omit<LessonSlot, 'id' | 'createdAt' | 'updatedAt'>) => {
-      const slot = await createLessonSlot(data);
-      await refresh();
-      return slot;
+export default function useLessonSlots(options?: { eagerLoad?: boolean }) {
+  const { items, loading, refresh, getById, add, update, remove } = useCRUD<
+    LessonSlot,
+    Omit<LessonSlot, 'id' | 'createdAt' | 'updatedAt'>,
+    Partial<LessonSlot>
+  >(
+    {
+      getAll: getLessonSlots,
+      getById: getLessonSlotById,
+      create: createLessonSlot,
+      update: updateLessonSlotAction,
+      remove: deleteLessonSlotAction,
     },
-    [refresh]
-  );
-
-  const updateLessonSlot = useCallback(
-    async (id: string, data: Partial<LessonSlot>) => {
-      const result = await updateLessonSlotAction(id, data);
-      await refresh();
-      return result;
-    },
-    [refresh]
-  );
-
-  const deleteLessonSlot = useCallback(
-    async (id: string) => {
-      await deleteLessonSlotAction(id);
-      await refresh();
-    },
-    [refresh]
+    { eagerLoad: options?.eagerLoad ?? false }
   );
 
   return {
-    lessonSlots,
+    lessonSlots: items,
     loading,
-    getLessonSlot,
-    addLessonSlot,
-    updateLessonSlot,
-    deleteLessonSlot,
+    getLessonSlot: getById!,
+    addLessonSlot: add!,
+    updateLessonSlot: update!,
+    deleteLessonSlot: remove!,
     refresh,
   };
 }

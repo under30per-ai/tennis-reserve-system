@@ -6,7 +6,8 @@ import { toTicketType, toMemberTicket, toTicketUsage } from '@/db/mappers';
 import { eq, and, desc } from 'drizzle-orm';
 import type { TicketType, MemberTicket, MemberTicketWithType, TicketUsage } from '@/domain/models';
 import { requireAdmin, requireAuth } from '@/app/actions/auth';
-import { checkAdminWriteLimit } from '@/lib/rate-limit';
+import { withAdminWrite } from '@/app/actions/admin-guard';
+import { buildPartialUpdate } from '@/lib/db-utils';
 import { writeAuditLog } from '@/lib/audit-log';
 
 // ── Admin: Ticket Type CRUD ───────────────────────────
@@ -30,47 +31,44 @@ export async function createTicketType(data: {
   validDays: number;
   price: number;
 }): Promise<TicketType> {
-  await requireAdmin();
-  await checkAdminWriteLimit();
-  const rows = await db
-    .insert(ticketTypes)
-    .values({
-      name: data.name,
-      description: data.description,
-      lessonCount: data.lessonCount,
-      validDays: data.validDays,
-      price: data.price,
-    })
-    .returning();
-  return toTicketType(rows[0]);
+  return withAdminWrite(async () => {
+    const rows = await db
+      .insert(ticketTypes)
+      .values({
+        name: data.name,
+        description: data.description,
+        lessonCount: data.lessonCount,
+        validDays: data.validDays,
+        price: data.price,
+      })
+      .returning();
+    return toTicketType(rows[0]);
+  });
 }
+
+const TICKET_TYPE_UPDATE_KEYS = [
+  'name', 'description', 'lessonCount', 'validDays', 'price', 'isActive',
+] as const;
 
 export async function updateTicketType(
   id: string,
   data: Partial<{ name: string; description: string; lessonCount: number; validDays: number; price: number; isActive: boolean }>
 ): Promise<TicketType | null> {
-  await requireAdmin();
-  await checkAdminWriteLimit();
-  const values: Record<string, unknown> = {};
-  if (data.name !== undefined) values.name = data.name;
-  if (data.description !== undefined) values.description = data.description;
-  if (data.lessonCount !== undefined) values.lessonCount = data.lessonCount;
-  if (data.validDays !== undefined) values.validDays = data.validDays;
-  if (data.price !== undefined) values.price = data.price;
-  if (data.isActive !== undefined) values.isActive = data.isActive;
-
-  const rows = await db
-    .update(ticketTypes)
-    .set(values)
-    .where(eq(ticketTypes.id, id))
-    .returning();
-  return rows.length > 0 ? toTicketType(rows[0]) : null;
+  return withAdminWrite(async () => {
+    const values = buildPartialUpdate(data, TICKET_TYPE_UPDATE_KEYS);
+    const rows = await db
+      .update(ticketTypes)
+      .set(values)
+      .where(eq(ticketTypes.id, id))
+      .returning();
+    return rows.length > 0 ? toTicketType(rows[0]) : null;
+  });
 }
 
 export async function deleteTicketType(id: string): Promise<void> {
-  await requireAdmin();
-  await checkAdminWriteLimit();
-  await db.update(ticketTypes).set({ isActive: false }).where(eq(ticketTypes.id, id));
+  return withAdminWrite(async () => {
+    await db.update(ticketTypes).set({ isActive: false }).where(eq(ticketTypes.id, id));
+  });
 }
 
 // ── Admin: Member Ticket Management ───────────────────
@@ -79,27 +77,27 @@ export async function issueMemberTicket(
   memberId: string,
   ticketTypeId: string
 ): Promise<MemberTicket> {
-  await requireAdmin();
-  await checkAdminWriteLimit();
-  const typeRows = await db.select().from(ticketTypes).where(eq(ticketTypes.id, ticketTypeId));
-  if (typeRows.length === 0) throw new Error('チケット種別が見つかりません');
-  const ticketType = toTicketType(typeRows[0]);
+  return withAdminWrite(async () => {
+    const typeRows = await db.select().from(ticketTypes).where(eq(ticketTypes.id, ticketTypeId));
+    if (typeRows.length === 0) throw new Error('チケット種別が見つかりません');
+    const ticketType = toTicketType(typeRows[0]);
 
-  const expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + ticketType.validDays);
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + ticketType.validDays);
 
-  const rows = await db
-    .insert(memberTickets)
-    .values({
-      memberId,
-      ticketTypeId,
-      remainingCount: ticketType.lessonCount,
-      expiresAt,
-    })
-    .returning();
-  const ticket = toMemberTicket(rows[0]);
-  await writeAuditLog({ actorId: 'admin', action: 'issue', targetType: 'memberTicket', targetId: ticket.id, details: `チケット発行: ${ticketType.name} → 会員${memberId}` });
-  return ticket;
+    const rows = await db
+      .insert(memberTickets)
+      .values({
+        memberId,
+        ticketTypeId,
+        remainingCount: ticketType.lessonCount,
+        expiresAt,
+      })
+      .returning();
+    const ticket = toMemberTicket(rows[0]);
+    await writeAuditLog({ actorId: 'admin', action: 'issue', targetType: 'memberTicket', targetId: ticket.id, details: `チケット発行: ${ticketType.name} → 会員${memberId}` });
+    return ticket;
+  });
 }
 
 export async function getAllMemberTickets(): Promise<MemberTicketWithType[]> {

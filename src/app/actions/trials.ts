@@ -6,8 +6,9 @@ import { toTrialApplication } from '@/db/mappers';
 import { eq, desc } from 'drizzle-orm';
 import type { TrialApplication, TrialStatus, LessonLevel } from '@/domain/models';
 import { requireAdmin } from '@/app/actions/auth';
+import { withAdminWrite } from '@/app/actions/admin-guard';
 import { sendTrialConfirmation, sendTrialStatusUpdate } from '@/lib/email';
-import { checkRateLimit, checkAdminWriteLimit } from '@/lib/rate-limit';
+import { checkRateLimit } from '@/lib/rate-limit';
 import { writeAuditLog } from '@/lib/audit-log';
 
 export async function applyForTrial(data: {
@@ -92,30 +93,30 @@ export async function updateTrialStatus(
   status: TrialStatus,
   adminNotes?: string
 ): Promise<TrialApplication | null> {
-  await requireAdmin();
-  await checkAdminWriteLimit();
-  const values: Record<string, unknown> = {
-    status,
-    reviewedAt: new Date(),
-  };
-  if (adminNotes !== undefined) values.adminNotes = adminNotes;
+  return withAdminWrite(async () => {
+    const values: Record<string, unknown> = {
+      status,
+      reviewedAt: new Date(),
+    };
+    if (adminNotes !== undefined) values.adminNotes = adminNotes;
 
-  const rows = await db
-    .update(trialApplications)
-    .set(values)
-    .where(eq(trialApplications.id, id))
-    .returning();
+    const rows = await db
+      .update(trialApplications)
+      .set(values)
+      .where(eq(trialApplications.id, id))
+      .returning();
 
-  if (rows.length === 0) return null;
-  const application = toTrialApplication(rows[0]);
+    if (rows.length === 0) return null;
+    const application = toTrialApplication(rows[0]);
 
-  await writeAuditLog({ actorId: 'admin', action: 'updateStatus', targetType: 'trialApplication', targetId: id, details: `体験申込ステータス変更: ${status}` });
+    await writeAuditLog({ actorId: 'admin', action: 'updateStatus', targetType: 'trialApplication', targetId: id, details: `体験申込ステータス変更: ${status}` });
 
-  try {
-    await sendTrialStatusUpdate(application.email, application.name, status);
-  } catch {
-    // メール送信失敗は更新には影響させない
-  }
+    try {
+      await sendTrialStatusUpdate(application.email, application.name, status);
+    } catch {
+      // メール送信失敗は更新には影響させない
+    }
 
-  return application;
+    return application;
+  });
 }
