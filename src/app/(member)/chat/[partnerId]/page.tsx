@@ -30,7 +30,7 @@ export default function MemberConversationPage() {
   const myId = user?.memberId ?? '';
 
   return (
-    <div className="flex flex-col h-[calc(100vh-8rem)] sm:h-[calc(100vh-3.5rem)]">
+    <div className="flex flex-col h-[calc(100vh-11rem)] sm:h-[calc(100vh-7rem)]">
       <div className="px-4 py-3 border-b bg-white">
         <h1 className="font-bold text-sm text-net-dark">
           {partnerName || 'メッセージ'}

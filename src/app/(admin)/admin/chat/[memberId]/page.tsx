@@ -26,7 +26,7 @@ export default function AdminConversationPage() {
   if (loading) return <LoadingSpinner />;
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)]">
+    <div className="flex flex-col h-[calc(100vh-8rem)] lg:h-[calc(100vh-7rem)]">
       <div className="px-4 py-3 border-b bg-white">
         <h1 className="font-bold text-sm text-net-dark">{partnerName}</h1>
       </div>
