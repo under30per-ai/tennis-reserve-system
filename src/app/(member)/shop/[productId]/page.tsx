@@ -38,7 +38,7 @@ export default function ProductDetailPage() {
     if (!product) return;
     addToCart(product, quantity);
     toast.success('カートに追加しました');
-    router.back();
+    setTimeout(() => router.back(), 800);
   };
 
   if (loading || !product) return <LoadingSpinner />;
