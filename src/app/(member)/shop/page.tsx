@@ -7,7 +7,6 @@ import useShop from '@/hooks/useShop';
 import Card from '@/components/ui/Card';
 import EmptyState from '@/components/ui/EmptyState';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
-import CartFloatingButton from '@/components/shop/CartFloatingButton';
 import { PRODUCT_CATEGORY_LABELS, PRODUCT_CATEGORY_COLORS } from '@/lib/constants';
 import type { ProductCategory } from '@/types';
 
@@ -99,7 +98,6 @@ export default function ShopCatalogPage() {
         </div>
       )}
 
-      <CartFloatingButton />
     </div>
   );
 }
