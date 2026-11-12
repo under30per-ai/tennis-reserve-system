@@ -327,6 +327,22 @@ export const eventRegistrations = pgTable('event_registrations', {
 
 // ── Chat ──────────────────────────────────────────────
 
+// ── Rate Limits ──────────────────────────────────────
+
+export const rateLimits = pgTable('rate_limits', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  identifier: varchar('identifier', { length: 255 }).notNull(),
+  action: varchar('action', { length: 100 }).notNull(),
+  count: integer('count').notNull().default(1),
+  windowStart: timestamp('window_start', { withTimezone: true }).notNull().defaultNow(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+}, (table) => [
+  index('idx_rate_limits_lookup').on(table.identifier, table.action),
+  index('idx_rate_limits_expires').on(table.expiresAt),
+]);
+
+// ── Chat ──────────────────────────────────────────────
+
 export const chatMessages = pgTable('chat_messages', {
   id: uuid('id').primaryKey().defaultRandom(),
   senderId: varchar('sender_id', { length: 255 }).notNull(),

@@ -4,12 +4,13 @@ import { randomInt, timingSafeEqual } from 'node:crypto';
 import { db } from '@/db';
 import { members, emailVerifications, chatMessages } from '@/db/schema';
 import { toMember } from '@/db/mappers';
-import { eq, or, ilike, and, gt } from 'drizzle-orm';
+import { eq, or, ilike, and, gt, inArray } from 'drizzle-orm';
 import type { Member, LessonLevel } from '@/domain/models';
 import { getRandomAvatarColor } from '@/lib/utils';
 import { sendVerificationCode } from '@/lib/email';
 import { validateEmail, validateRequired, validatePhone, validatePassword } from '@/lib/validators';
 import { hashPassword } from '@/lib/password';
+import { checkRateLimit } from '@/lib/rate-limit';
 import { requireAdmin, requireAuth } from '@/app/actions/auth';
 import { unstable_cache, revalidateTag } from 'next/cache';
 
@@ -38,6 +39,19 @@ export async function getMemberById(id: string): Promise<Member | null> {
     throw new Error('権限がありません');
   }
   return fetchMemberById(id);
+}
+
+export async function getMembersByIds(ids: string[]): Promise<Record<string, Member>> {
+  await requireAdmin();
+  if (ids.length === 0) return {};
+  const uniqueIds = [...new Set(ids)];
+  const rows = await db.select().from(members).where(inArray(members.id, uniqueIds));
+  const map: Record<string, Member> = {};
+  for (const row of rows) {
+    const member = toMember(row);
+    map[member.id] = member;
+  }
+  return map;
 }
 
 // Internal helper — not exported as a server action
@@ -132,6 +146,13 @@ export async function registerMember(data: {
   phone: string;
   password: string;
 }): Promise<{ success: true; email: string } | { success: false; error: string }> {
+  // Rate limit: 5 attempts per hour per email
+  const rl = await checkRateLimit(data.email, 'register', 5, 60 * 60 * 1000);
+  if (!rl.allowed) {
+    const minutes = Math.ceil(rl.retryAfterMs / 60000);
+    return { success: false, error: `登録試行回数が上限に達しました。${minutes}分後に再度お試しください。` };
+  }
+
   // Server-side validation
   const nameError = validateRequired(data.name, '氏名');
   if (nameError) return { success: false, error: nameError };
@@ -187,6 +208,13 @@ export async function verifyEmail(data: {
   email: string;
   code: string;
 }): Promise<{ success: true; member: Member } | { success: false; error: string }> {
+  // Rate limit: 10 attempts per 15 minutes per email
+  const rl = await checkRateLimit(data.email, 'verifyEmail', 10, 15 * 60 * 1000);
+  if (!rl.allowed) {
+    const minutes = Math.ceil(rl.retryAfterMs / 60000);
+    return { success: false, error: `認証コードの試行回数が上限に達しました。${minutes}分後に再度お試しください。` };
+  }
+
   // Check attempt count first
   const existing = await db
     .select()
@@ -252,6 +280,13 @@ export async function verifyEmail(data: {
 }
 
 export async function resendVerificationCode(email: string): Promise<{ success: true } | { success: false; error: string }> {
+  // Rate limit: 3 attempts per hour per email
+  const rl = await checkRateLimit(email, 'resendVerificationCode', 3, 60 * 60 * 1000);
+  if (!rl.allowed) {
+    const minutes = Math.ceil(rl.retryAfterMs / 60000);
+    return { success: false, error: `再送回数が上限に達しました。${minutes}分後に再度お試しください。` };
+  }
+
   const existing = await db
     .select()
     .from(emailVerifications)

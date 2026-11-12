@@ -36,7 +36,7 @@ export default function RecordEditPage() {
   const instanceId = params.instanceId as string;
   const { getInstanceWithDetails, loading } = useLessonInstances();
   const { getRecordForInstance, getReservationsForInstance, createRecord, updateRecord, loading: recordsLoading } = useLessonRecords();
-  const { getMember, loading: membersLoading } = useMembers();
+  const { getMembersByIdsBatch, loading: membersLoading } = useMembers();
   const toast = useToast();
 
   const [instanceDetails, setInstanceDetails] = useState<LessonInstanceWithDetails | null>(null);
@@ -67,39 +67,39 @@ export default function RecordEditPage() {
       if (record) {
         setTheme(record.theme);
         setContent(record.content);
-        const notes = await Promise.all(
-          record.memberNotes.map(async (note) => {
-            const m = await getMember(note.memberId);
-            return {
-              memberId: note.memberId,
-              memberName: m?.name ?? '不明',
-              avatarColor: m?.avatarColor ?? '#888',
-              attendance: note.attendance,
-              performanceRating: note.performanceRating,
-              goodPoints: note.goodPoints,
-              improvementPoints: note.improvementPoints,
-              memo: note.memo,
-            };
-          })
-        );
+        const memberIds = record.memberNotes.map(n => n.memberId);
+        const membersMap = await getMembersByIdsBatch(memberIds);
+        const notes = record.memberNotes.map((note) => {
+          const m = membersMap[note.memberId];
+          return {
+            memberId: note.memberId,
+            memberName: m?.name ?? '不明',
+            avatarColor: m?.avatarColor ?? '#888',
+            attendance: note.attendance,
+            performanceRating: note.performanceRating,
+            goodPoints: note.goodPoints,
+            improvementPoints: note.improvementPoints,
+            memo: note.memo,
+          };
+        });
         if (!cancelled) setMemberNotes(notes);
       } else {
         const reservations = await getReservationsForInstance(instanceId);
-        const notes = await Promise.all(
-          reservations.map(async (r: { memberId: string }) => {
-            const m = await getMember(r.memberId);
-            return {
-              memberId: r.memberId,
-              memberName: m?.name ?? '不明',
-              avatarColor: m?.avatarColor ?? '#888',
-              attendance: 'present' as AttendanceStatus,
-              performanceRating: 3,
-              goodPoints: '',
-              improvementPoints: '',
-              memo: '',
-            };
-          })
-        );
+        const memberIds = reservations.map((r: { memberId: string }) => r.memberId);
+        const membersMap = await getMembersByIdsBatch(memberIds);
+        const notes = reservations.map((r: { memberId: string }) => {
+          const m = membersMap[r.memberId];
+          return {
+            memberId: r.memberId,
+            memberName: m?.name ?? '不明',
+            avatarColor: m?.avatarColor ?? '#888',
+            attendance: 'present' as AttendanceStatus,
+            performanceRating: 3,
+            goodPoints: '',
+            improvementPoints: '',
+            memo: '',
+          };
+        });
         if (!cancelled) setMemberNotes(notes);
       }
 
@@ -107,7 +107,7 @@ export default function RecordEditPage() {
     };
     loadData();
     return () => { cancelled = true; };
-  }, [instanceId, getInstanceWithDetails, getRecordForInstance, getReservationsForInstance, getMember]);
+  }, [instanceId, getInstanceWithDetails, getRecordForInstance, getReservationsForInstance, getMembersByIdsBatch]);
 
   const updateMemberNote = (index: number, field: keyof MemberNoteForm, value: string | number) => {
     setMemberNotes(prev => prev.map((note, i) => i === index ? { ...note, [field]: value } : note));

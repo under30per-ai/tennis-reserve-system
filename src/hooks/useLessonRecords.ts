@@ -12,6 +12,7 @@ import {
   createLessonRecord,
   updateLessonRecord as updateRecordAction,
   getLessonRecordByInstanceId,
+  getRecordsByInstanceIds as fetchRecordsByInstanceIds,
   getLessonRecordWithDetails,
   getMemberLessonHistory as fetchMemberHistory,
   getReservationsForInstance as fetchReservationsForInstance,
@@ -43,6 +44,13 @@ export default function useLessonRecords(options?: UseLessonRecordsOptions) {
   const getRecordForInstance = useCallback(
     async (instanceId: string): Promise<LessonRecord | null> => {
       return getLessonRecordByInstanceId(instanceId);
+    },
+    []
+  );
+
+  const getRecordsByInstanceIds = useCallback(
+    async (instanceIds: string[]): Promise<Record<string, LessonRecord>> => {
+      return fetchRecordsByInstanceIds(instanceIds);
     },
     []
   );
@@ -92,6 +100,7 @@ export default function useLessonRecords(options?: UseLessonRecordsOptions) {
     records,
     loading,
     getRecordForInstance,
+    getRecordsByInstanceIds,
     createRecord,
     updateRecord,
     getRecordWithDetails,

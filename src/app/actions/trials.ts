@@ -7,6 +7,7 @@ import { eq, desc } from 'drizzle-orm';
 import type { TrialApplication, TrialStatus, LessonLevel } from '@/domain/models';
 import { requireAdmin } from '@/app/actions/auth';
 import { sendTrialConfirmation, sendTrialStatusUpdate } from '@/lib/email';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 export async function applyForTrial(data: {
   name: string;
@@ -18,6 +19,13 @@ export async function applyForTrial(data: {
   preferredTime: string;
   message: string;
 }): Promise<TrialApplication> {
+  // Rate limit: 5 attempts per hour per email
+  const rl = await checkRateLimit(data.email, 'applyForTrial', 5, 60 * 60 * 1000);
+  if (!rl.allowed) {
+    const minutes = Math.ceil(rl.retryAfterMs / 60000);
+    throw new Error(`体験申込の回数が上限に達しました。${minutes}分後に再度お試しください。`);
+  }
+
   // Server-side validation for public endpoint
   if (!data.name.trim()) throw new Error('お名前を入力してください');
   if (!data.nameKana.trim()) throw new Error('お名前（カナ）を入力してください');

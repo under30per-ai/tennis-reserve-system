@@ -25,7 +25,7 @@ interface DisplayItem {
 export default function RecordsPage() {
   const router = useRouter();
   const { getInstancesWithDetailsForDateRange } = useLessonInstances();
-  const { getRecordForInstance } = useLessonRecords();
+  const { getRecordsByInstanceIds } = useLessonRecords();
   const [weekOffset, setWeekOffset] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [dataLoading, setDataLoading] = useState(true);
@@ -50,19 +50,20 @@ export default function RecordsPage() {
     const weStr = format(weekEnd, 'yyyy-MM-dd');
     getInstancesWithDetailsForDateRange(wsStr, weStr).then(async allInstances => {
       if (cancelled) return;
-      const items = await Promise.all(
-        allInstances.map(async inst => {
-          const record = await getRecordForInstance(inst.id);
-          return { instance: inst, record };
-        })
-      );
+      const instanceIds = allInstances.map(inst => inst.id);
+      const recordsMap = await getRecordsByInstanceIds(instanceIds);
       if (!cancelled) {
-        setWeekInstances(items);
+        setWeekInstances(
+          allInstances.map(inst => ({
+            instance: inst,
+            record: recordsMap[inst.id] ?? null,
+          }))
+        );
         setDataLoading(false);
       }
     });
     return () => { cancelled = true; };
-  }, [weekStart, weekEnd, getInstancesWithDetailsForDateRange, getRecordForInstance]);
+  }, [weekStart, weekEnd, getInstancesWithDetailsForDateRange, getRecordsByInstanceIds]);
 
   // Search results: when searching, fetch a broad range and filter
   const [searchResults, setSearchResults] = useState<DisplayItem[] | null>(null);
@@ -75,13 +76,13 @@ export default function RecordsPage() {
     const searchTo = format(addWeeks(new Date(), 4), 'yyyy-MM-dd');
     getInstancesWithDetailsForDateRange(searchFrom, searchTo).then(async allInstances => {
       if (cancelled) return;
-      const items = await Promise.all(
-        allInstances.map(async inst => {
-          const record = await getRecordForInstance(inst.id);
-          return { instance: inst, record };
-        })
-      );
+      const instanceIds = allInstances.map(inst => inst.id);
+      const recordsMap = await getRecordsByInstanceIds(instanceIds);
       if (!cancelled) {
+        const items = allInstances.map(inst => ({
+          instance: inst,
+          record: recordsMap[inst.id] ?? null,
+        }));
         setSearchResults(
           items
             .filter(item => {
@@ -100,7 +101,7 @@ export default function RecordsPage() {
       }
     });
     return () => { cancelled = true; };
-  }, [searchQuery, getInstancesWithDetailsForDateRange, getRecordForInstance]);
+  }, [searchQuery, getInstancesWithDetailsForDateRange, getRecordsByInstanceIds]);
 
   const isSearching = searchQuery.trim().length > 0;
   const displayItems = isSearching ? (searchResults ?? []) : weekInstances;

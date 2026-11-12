@@ -15,6 +15,13 @@
       "when": 1794409110879,
       "tag": "0001_security-and-schema-improvements",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794491320525,
+      "tag": "0002_tired_mastermind",
+      "breakpoints": true
     }
   ]
 }

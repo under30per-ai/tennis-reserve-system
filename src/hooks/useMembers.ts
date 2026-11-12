@@ -5,6 +5,7 @@ import { Member, LessonLevel } from '@/types';
 import {
   getMembers as fetchMembers,
   getMemberById,
+  getMembersByIds as fetchMembersByIds,
   createMember,
   updateMember as updateMemberAction,
   deleteMember as deleteMemberAction,
@@ -35,6 +36,10 @@ export default function useMembers(options?: UseMembersOptions) {
 
   const getMember = useCallback(async (id: string) => {
     return getMemberById(id);
+  }, []);
+
+  const getMembersByIdsBatch = useCallback(async (ids: string[]) => {
+    return fetchMembersByIds(ids);
   }, []);
 
   const addMember = useCallback(
@@ -87,6 +92,7 @@ export default function useMembers(options?: UseMembersOptions) {
     members,
     loading,
     getMember,
+    getMembersByIdsBatch,
     addMember,
     updateMember,
     deleteMember,
