@@ -3,9 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import useAuth from '@/hooks/useAuth';
+import { useMemberData } from '@/contexts/MemberDataContext';
 import useLessonInstances from '@/hooks/useLessonInstances';
 import useReservations from '@/hooks/useReservations';
-import useMembers from '@/hooks/useMembers';
 import useToast from '@/hooks/useToast';
 import Card, { CardTitle } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
@@ -15,7 +15,7 @@ import NetDivider from '@/components/tennis/NetDivider';
 import TennisBallIcon from '@/components/tennis/TennisBallIcon';
 import { formatDate, getAvailabilityLabel } from '@/lib/utils';
 import { DAY_LABELS } from '@/lib/constants';
-import { LessonInstanceWithDetails, Member } from '@/types';
+import { LessonInstanceWithDetails } from '@/types';
 
 export default function ReserveConfirmPage() {
   const params = useParams();
@@ -25,27 +25,20 @@ export default function ReserveConfirmPage() {
   const isTransferMode = !!fromInstanceId;
   const router = useRouter();
   const { user } = useAuth();
+  const { member, loading: memberLoading, refreshReservations } = useMemberData();
   const { getInstanceWithDetails, loading: instancesLoading } = useLessonInstances();
-  const { makeReservation, transferReservation, loading: reservationsLoading } = useReservations();
-  const { getMember, loading: membersLoading } = useMembers();
+  const { makeReservation, transferReservation } = useReservations();
   const toast = useToast();
 
-  const [member, setMember] = useState<Member | null>(null);
   const [instance, setInstance] = useState<LessonInstanceWithDetails | null>(null);
-
-  useEffect(() => {
-    if (user?.memberId) {
-      getMember(user.memberId).then(m => setMember(m));
-    }
-  }, [user, getMember]);
 
   useEffect(() => {
     getInstanceWithDetails(instanceId).then(inst => setInstance(inst));
   }, [instanceId, getInstanceWithDetails]);
 
-  const transferDisabled = isTransferMode && (!member || member.remainingTransfers <= 0);
+  const transferDisabled = isTransferMode && !member;
 
-  if (instancesLoading || membersLoading || reservationsLoading || !instance) return <LoadingSpinner />;
+  if (instancesLoading || memberLoading || !instance) return <LoadingSpinner />;
 
   const avail = getAvailabilityLabel(instance.availableSpots, instance.maxCapacity);
   const isFull = instance.availableSpots <= 0;
@@ -59,6 +52,7 @@ export default function ReserveConfirmPage() {
       if (isTransferMode) {
         await transferReservation(user.memberId, fromInstanceId, instanceId);
         toast.success('振替が完了しました');
+        refreshReservations();
         router.push('/transfer');
       } else {
         const res = await makeReservation(user.memberId, instanceId);
@@ -67,6 +61,7 @@ export default function ReserveConfirmPage() {
         } else {
           toast.success('予約が確定しました');
         }
+        refreshReservations();
         router.push('/reserve/complete');
       }
     } catch (err: unknown) {
@@ -126,12 +121,6 @@ export default function ReserveConfirmPage() {
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
             <p className="text-sm text-yellow-800 font-medium">定員に達しています</p>
             <p className="text-xs text-yellow-600">キャンセル待ちとして登録されます</p>
-          </div>
-        )}
-
-        {!isPast && transferDisabled && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
-            <p className="text-sm text-yellow-800">振替回数の上限に達しています</p>
           </div>
         )}
 

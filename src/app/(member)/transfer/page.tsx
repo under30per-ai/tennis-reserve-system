@@ -3,10 +3,8 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { format, addWeeks, subWeeks, isToday } from 'date-fns';
-import useAuth from '@/hooks/useAuth';
-import useReservations from '@/hooks/useReservations';
+import { useMemberData } from '@/contexts/MemberDataContext';
 import useLessonInstances from '@/hooks/useLessonInstances';
-import useMembers from '@/hooks/useMembers';
 import Card, { CardTitle } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
@@ -17,39 +15,19 @@ import NetDivider from '@/components/tennis/NetDivider';
 import { getWeekDays, formatWeekRange } from '@/lib/calendar-utils';
 import { DAY_LABELS } from '@/lib/constants';
 import { formatDate, toISODateString, getAvailabilityLabel } from '@/lib/utils';
-import { ReservationWithDetails, Member, LessonInstanceWithDetails } from '@/types';
+import { ReservationWithDetails, LessonInstanceWithDetails } from '@/types';
 
 export default function TransferPage() {
   const router = useRouter();
-  const { user } = useAuth();
-  const { getMemberReservations } = useReservations();
+  const { reservations, loading } = useMemberData();
   const { getInstanceWithDetails, getInstancesWithDetailsForDateRange } = useLessonInstances();
-  const { getMember } = useMembers();
 
   const [selectedFrom, setSelectedFrom] = useState<string | null>(null);
   const [currentDate, setCurrentDate] = useState(new Date());
-  const [member, setMember] = useState<Member | null>(null);
-  const [reservations, setReservations] = useState<ReservationWithDetails[]>([]);
-  const [reservationsLoaded, setReservationsLoaded] = useState(false);
   const [completedTransferData, setCompletedTransferData] = useState<{ reservation: ReservationWithDetails; fromInstance: LessonInstanceWithDetails | null }[]>([]);
   const [availableTargets, setAvailableTargets] = useState<LessonInstanceWithDetails[]>([]);
 
   const weekDays = useMemo(() => getWeekDays(currentDate), [currentDate]);
-
-  useEffect(() => {
-    if (user?.memberId) {
-      getMember(user.memberId).then(m => setMember(m));
-    }
-  }, [user, getMember]);
-
-  useEffect(() => {
-    if (user?.memberId) {
-      getMemberReservations(user.memberId).then(r => {
-        setReservations(r);
-        setReservationsLoaded(true);
-      });
-    }
-  }, [user, getMemberReservations]);
 
   // Completed transfers: confirmed reservations that have a transferFromInstanceId
   const completedTransferReservations = useMemo(() => {
@@ -74,6 +52,9 @@ export default function TransferPage() {
     const eligible: (ReservationWithDetails & { reason: 'member_cancelled' | 'lesson_cancelled' })[] = [];
 
     for (const r of reservations) {
+      // 振替先の予約は再度振替できない
+      if (r.transferFromInstanceId) continue;
+
       if (r.status === 'cancelled') {
         eligible.push({ ...r, reason: 'member_cancelled' });
       } else if ((r.status === 'confirmed' || r.status === 'waitlisted') && r.lessonInstance.isCancelled) {
@@ -116,20 +97,13 @@ export default function TransferPage() {
 
   const fromRes = transferEligible.find(r => r.id === selectedFrom);
 
-  if (!reservationsLoaded) return <LoadingSpinner />;
+  if (loading) return <LoadingSpinner />;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-bold text-net-dark">振替予約</h1>
-        {member && <p className="text-sm text-gray-500">振替残回数: <span className="font-bold text-court-green">{member.remainingTransfers}</span></p>}
       </div>
-
-      {member && member.remainingTransfers <= 0 && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-          <p className="text-sm text-yellow-800">振替回数の上限に達しています</p>
-        </div>
-      )}
 
       {completedTransferData.length > 0 && (
         <Card>

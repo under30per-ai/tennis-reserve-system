@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import useAuth from '@/hooks/useAuth';
-import useMembers from '@/hooks/useMembers';
+import { useState } from 'react';
+import { useMemberData } from '@/contexts/MemberDataContext';
 import useToast from '@/hooks/useToast';
 import Card, { CardTitle } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
@@ -17,26 +16,24 @@ import { Member } from '@/types';
 import { updateOwnProfile } from '@/app/actions/members';
 
 export default function ProfilePage() {
-  const { user } = useAuth();
-  const { getMember, loading } = useMembers();
+  const { member: cachedMember, loading, refreshMember } = useMemberData();
   const toast = useToast();
 
-  const [member, setMember] = useState<Member | null>(null);
+  const [editMember, setEditMember] = useState<Member | null>(null);
   const [isEditing, setIsEditing] = useState(false);
 
-  useEffect(() => {
-    if (user?.memberId) {
-      getMember(user.memberId).then(m => setMember(m));
-    }
-  }, [user, getMember]);
+  if (loading || !cachedMember) return <LoadingSpinner />;
 
-  if (loading || !member) return <LoadingSpinner />;
+  const member = isEditing && editMember ? editMember : cachedMember;
 
   const handleSave = async () => {
+    if (!editMember) return;
     try {
-      await updateOwnProfile({ name: member.name, nameKana: member.nameKana, phone: member.phone });
+      await updateOwnProfile({ name: editMember.name, nameKana: editMember.nameKana, phone: editMember.phone });
       toast.success('プロフィールを更新しました');
       setIsEditing(false);
+      setEditMember(null);
+      await refreshMember();
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'プロフィールの更新に失敗しました');
     }
@@ -71,10 +68,6 @@ export default function ProfilePage() {
             <p className="text-sm font-medium">{formatDate(member.joinDate)}</p>
           </div>
           <div>
-            <p className="text-xs text-gray-400 mb-1">振替残回数</p>
-            <p className="text-sm font-bold text-court-green">{member.remainingTransfers}回</p>
-          </div>
-          <div>
             <p className="text-xs text-gray-400 mb-1">メールアドレス</p>
             <p className="text-sm font-medium">{member.email}</p>
           </div>
@@ -90,16 +83,16 @@ export default function ProfilePage() {
       <Card>
         <div className="flex items-center justify-between mb-4">
           <CardTitle>プロフィール編集</CardTitle>
-          {!isEditing && <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>編集</Button>}
+          {!isEditing && <Button variant="outline" size="sm" onClick={() => { setEditMember({ ...cachedMember }); setIsEditing(true); }}>編集</Button>}
         </div>
         {isEditing ? (
           <div className="space-y-4">
-            <Input label="氏名" value={member.name} onChange={e => setMember(m => m ? { ...m, name: e.target.value } : m)} />
-            <Input label="フリガナ" value={member.nameKana} onChange={e => setMember(m => m ? { ...m, nameKana: e.target.value } : m)} />
-            <Input label="電話番号" value={member.phone} onChange={e => setMember(m => m ? { ...m, phone: e.target.value } : m)} />
+            <Input label="氏名" value={member.name} onChange={e => setEditMember(m => m ? { ...m, name: e.target.value } : m)} />
+            <Input label="フリガナ" value={member.nameKana} onChange={e => setEditMember(m => m ? { ...m, nameKana: e.target.value } : m)} />
+            <Input label="電話番号" value={member.phone} onChange={e => setEditMember(m => m ? { ...m, phone: e.target.value } : m)} />
             <div className="flex gap-3">
               <Button onClick={handleSave}>保存</Button>
-              <Button variant="ghost" onClick={() => setIsEditing(false)}>キャンセル</Button>
+              <Button variant="ghost" onClick={() => { setIsEditing(false); setEditMember(null); }}>キャンセル</Button>
             </div>
           </div>
         ) : (

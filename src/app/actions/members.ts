@@ -11,6 +11,7 @@ import { sendVerificationCode } from '@/lib/email';
 import { validateEmail, validateRequired, validatePhone, validatePassword } from '@/lib/validators';
 import { hashPassword } from '@/lib/password';
 import { requireAdmin, requireAuth } from '@/app/actions/auth';
+import { unstable_cache, revalidateTag } from 'next/cache';
 
 const MAX_OTP_ATTEMPTS = 5;
 
@@ -20,14 +21,23 @@ export async function getMembers(): Promise<Member[]> {
   return rows.map(toMember);
 }
 
+const fetchMemberById = (id: string) =>
+  unstable_cache(
+    async () => {
+      const rows = await db.select().from(members).where(eq(members.id, id));
+      return rows.length > 0 ? toMember(rows[0]) : null;
+    },
+    [`member-${id}`],
+    { tags: [`member:${id}`], revalidate: 300 }
+  )();
+
 export async function getMemberById(id: string): Promise<Member | null> {
   const user = await requireAuth();
   // 管理者以外は自分のIDのみ取得可能
   if (user.role !== 'admin' && user.memberId !== id) {
     throw new Error('権限がありません');
   }
-  const rows = await db.select().from(members).where(eq(members.id, id));
-  return rows.length > 0 ? toMember(rows[0]) : null;
+  return fetchMemberById(id);
 }
 
 // Internal helper — not exported as a server action
@@ -84,6 +94,7 @@ export async function updateMember(id: string, data: Partial<Member> & { passwor
   if (data.remainingTransfers !== undefined) values.remainingTransfers = data.remainingTransfers;
 
   const rows = await db.update(members).set(values).where(eq(members.id, id)).returning();
+  revalidateTag(`member:${id}`, 'max');
   return rows.length > 0 ? toMember(rows[0]) : null;
 }
 
@@ -294,5 +305,6 @@ export async function updateOwnProfile(data: {
     .set(values)
     .where(eq(members.id, user.memberId))
     .returning();
+  revalidateTag(`member:${user.memberId}`, 'max');
   return rows.length > 0 ? toMember(rows[0]) : null;
 }

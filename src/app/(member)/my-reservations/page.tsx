@@ -1,8 +1,8 @@
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import useAuth from '@/hooks/useAuth';
+import { useMemberData } from '@/contexts/MemberDataContext';
 import useReservations from '@/hooks/useReservations';
 import useToast from '@/hooks/useToast';
 import Card from '@/components/ui/Card';
@@ -18,19 +18,12 @@ import { formatDate, toISODateString } from '@/lib/utils';
 import { ReservationWithDetails } from '@/types';
 
 export default function MyReservationsPage() {
-  const { user } = useAuth();
   const router = useRouter();
-  const { getMemberReservations, cancelReservation, loading } = useReservations();
+  const { reservations, loading, refreshReservations } = useMemberData();
+  const { cancelReservation } = useReservations();
   const toast = useToast();
   const [tab, setTab] = useState('upcoming');
   const [cancelTarget, setCancelTarget] = useState<string | null>(null);
-  const [reservations, setReservations] = useState<ReservationWithDetails[]>([]);
-
-  useEffect(() => {
-    if (user?.memberId) {
-      getMemberReservations(user.memberId).then(r => setReservations(r));
-    }
-  }, [user, getMemberReservations]);
 
   const today = toISODateString(new Date());
 
@@ -75,11 +68,7 @@ export default function MyReservationsPage() {
         await cancelReservation(cancelTarget);
         toast.success('予約をキャンセルしました');
         setCancelTarget(null);
-        // Refresh reservations after cancellation
-        if (user?.memberId) {
-          const updated = await getMemberReservations(user.memberId);
-          setReservations(updated);
-        }
+        await refreshReservations();
       } catch (err: unknown) {
         toast.error(err instanceof Error ? err.message : '予約のキャンセルに失敗しました');
       }

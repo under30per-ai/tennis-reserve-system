@@ -6,6 +6,7 @@ import useAuth from '@/hooks/useAuth';
 import MemberHeader from '@/components/layout/MemberHeader';
 import MemberNav from '@/components/layout/MemberNav';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
+import { MemberDataProvider } from '@/contexts/MemberDataContext';
 
 export default function MemberLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, user, loading } = useAuth();
@@ -45,14 +46,16 @@ export default function MemberLayout({ children }: { children: React.ReactNode }
     <div className="min-h-screen flex flex-col">
       <div ref={topRef} />
       <MemberHeader />
-      <div className="flex flex-1">
-        <MemberNav />
-        <main className="flex-1 min-w-0 pb-20 sm:pb-0">
-          <div className="max-w-5xl mx-auto px-4 py-6 overflow-x-hidden">
-            {children}
-          </div>
-        </main>
-      </div>
+      <MemberDataProvider>
+        <div className="flex flex-1">
+          <MemberNav />
+          <main className="flex-1 min-w-0 pb-20 sm:pb-0">
+            <div className="max-w-5xl mx-auto px-4 py-6 overflow-x-hidden">
+              {children}
+            </div>
+          </main>
+        </div>
+      </MemberDataProvider>
     </div>
   );
 }

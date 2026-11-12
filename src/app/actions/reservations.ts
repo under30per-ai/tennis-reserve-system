@@ -21,6 +21,7 @@ import { eq, and, inArray } from 'drizzle-orm';
 import type { Reservation, ReservationWithDetails } from '@/domain/models';
 import { requireAuth, requireAdmin } from '@/app/actions/auth';
 import { createNotificationInternal as createNotification } from '@/app/actions/notification-helper';
+import { unstable_cache, revalidateTag } from 'next/cache';
 
 export async function getReservations(): Promise<Reservation[]> {
   await requireAdmin();
@@ -101,6 +102,7 @@ export async function makeReservation(
     // 通知失敗は予約には影響させない
   }
 
+  revalidateTag(`reservations:${memberId}`, 'max');
   return reservation.reservation;
 }
 
@@ -166,8 +168,13 @@ export async function cancelReservation(reservationId: string): Promise<void> {
       } catch {
         // 通知失敗は操作に影響させない
       }
+
+      // 繰上げされた会員のキャッシュも更新
+      revalidateTag(`reservations:${waitlisted[0].memberId}`, 'max');
     }
   }
+
+  revalidateTag(`reservations:${reservation.memberId}`, 'max');
 }
 
 export async function transferReservation(
@@ -222,14 +229,6 @@ export async function transferReservation(
     throw new Error('振替先のレッスンは既に予約済みです');
   }
 
-  // Validate member has transfers remaining
-  const memberRows = await db
-    .select()
-    .from(members)
-    .where(eq(members.id, memberId));
-  if (memberRows.length === 0) throw new Error('会員情報が見つかりません');
-  if (memberRows[0].remainingTransfers <= 0) throw new Error('振替回数の上限に達しています');
-
   // 振替元の予約を取得
   const allRes = await db
     .select()
@@ -246,6 +245,11 @@ export async function transferReservation(
 
   if (!original) {
     throw new Error('振替元の予約が見つかりません');
+  }
+
+  // 振替先の予約は再度振替できない
+  if (original.transferFromInstanceId) {
+    throw new Error('振替先の予約を再度振替することはできません');
   }
 
   await db
@@ -269,14 +273,6 @@ export async function transferReservation(
     })
     .returning();
 
-  await db
-    .update(members)
-    .set({
-      remainingTransfers: memberRows[0].remainingTransfers - 1,
-      updatedAt: new Date(),
-    })
-    .where(eq(members.id, memberId));
-
   const newReservation = toReservation(newRows[0]);
 
   try {
@@ -291,8 +287,37 @@ export async function transferReservation(
     // 通知失敗は操作に影響させない
   }
 
+  revalidateTag(`reservations:${memberId}`, 'max');
   return newReservation;
 }
+
+const fetchMemberReservations = (memberId: string) =>
+  unstable_cache(
+    async () => {
+      const rows = await db
+        .select()
+        .from(reservations)
+        .innerJoin(lessonInstances, eq(reservations.lessonInstanceId, lessonInstances.id))
+        .innerJoin(lessonSlots, eq(lessonInstances.lessonSlotId, lessonSlots.id))
+        .innerJoin(members, eq(reservations.memberId, members.id))
+        .innerJoin(coaches, eq(lessonInstances.coachId, coaches.id))
+        .innerJoin(courts, eq(lessonInstances.courtId, courts.id))
+        .where(eq(reservations.memberId, memberId));
+
+      return rows
+        .map((row) => ({
+          ...toReservation(row.reservations),
+          member: toMember(row.members),
+          lessonInstance: toLessonInstance(row.lesson_instances),
+          lessonSlot: toLessonSlot(row.lesson_slots),
+          coach: toCoach(row.coaches),
+          court: toCourt(row.courts),
+        }))
+        .sort((a, b) => b.lessonInstance.date.localeCompare(a.lessonInstance.date));
+    },
+    [`member-reservations-${memberId}`],
+    { tags: [`reservations:${memberId}`], revalidate: 300 }
+  )();
 
 export async function getMemberReservations(
   memberId: string
@@ -302,26 +327,7 @@ export async function getMemberReservations(
   if (user.role !== 'admin' && user.memberId !== memberId) {
     throw new Error('権限がありません');
   }
-  const rows = await db
-    .select()
-    .from(reservations)
-    .innerJoin(lessonInstances, eq(reservations.lessonInstanceId, lessonInstances.id))
-    .innerJoin(lessonSlots, eq(lessonInstances.lessonSlotId, lessonSlots.id))
-    .innerJoin(members, eq(reservations.memberId, members.id))
-    .innerJoin(coaches, eq(lessonInstances.coachId, coaches.id))
-    .innerJoin(courts, eq(lessonInstances.courtId, courts.id))
-    .where(eq(reservations.memberId, memberId));
-
-  return rows
-    .map((row) => ({
-      ...toReservation(row.reservations),
-      member: toMember(row.members),
-      lessonInstance: toLessonInstance(row.lesson_instances),
-      lessonSlot: toLessonSlot(row.lesson_slots),
-      coach: toCoach(row.coaches),
-      court: toCourt(row.courts),
-    }))
-    .sort((a, b) => b.lessonInstance.date.localeCompare(a.lessonInstance.date));
+  return fetchMemberReservations(memberId);
 }
 
 export async function getReservationsForInstance(

@@ -1,10 +1,9 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import useAuth from '@/hooks/useAuth';
-import useReservations from '@/hooks/useReservations';
-import useMembers from '@/hooks/useMembers';
+import { useMemberData } from '@/contexts/MemberDataContext';
 import Card, { CardTitle } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Badge from '@/components/ui/Badge';
@@ -17,28 +16,11 @@ import CourtIllustration from '@/components/tennis/CourtIllustration';
 import { RESERVATION_STATUS_LABELS } from '@/lib/constants';
 import { formatDate } from '@/lib/utils';
 import { toISODateString } from '@/lib/utils';
-import { Member, ReservationWithDetails } from '@/types';
 
 export default function MemberDashboardPage() {
   const { user } = useAuth();
-  const { getMemberReservations, loading: reservationsLoading } = useReservations();
-  const { getMember, loading: membersLoading } = useMembers();
+  const { reservations, loading } = useMemberData();
   const router = useRouter();
-
-  const [member, setMember] = useState<Member | null>(null);
-  const [reservations, setReservations] = useState<ReservationWithDetails[]>([]);
-
-  useEffect(() => {
-    if (user?.memberId) {
-      getMember(user.memberId).then(m => setMember(m));
-    }
-  }, [user, getMember]);
-
-  useEffect(() => {
-    if (user?.memberId) {
-      getMemberReservations(user.memberId).then(r => setReservations(r));
-    }
-  }, [user, getMemberReservations]);
 
   const today = toISODateString(new Date());
   const upcoming = reservations
@@ -61,7 +43,7 @@ export default function MemberDashboardPage() {
     });
   }, [reservations]);
 
-  if (reservationsLoading || membersLoading) return <LoadingSpinner />;
+  if (loading) return <LoadingSpinner />;
 
   return (
     <div className="space-y-6">
@@ -124,28 +106,15 @@ export default function MemberDashboardPage() {
         </div>
       </div>
 
-      <div className="grid sm:grid-cols-2 gap-4">
-        <Card className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-court-light flex items-center justify-center">
-            <TennisBallIcon size={28} />
-          </div>
-          <div>
-            <p className="text-2xl font-bold text-court-green">{upcoming.length}</p>
-            <p className="text-xs text-gray-500">今後の予約</p>
-          </div>
-        </Card>
-        <Card className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-full bg-ball-glow flex items-center justify-center">
-            <svg className="w-6 h-6 text-court-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-          </div>
-          <div>
-            <p className="text-2xl font-bold text-court-green">{member?.remainingTransfers ?? 0}</p>
-            <p className="text-xs text-gray-500">振替残回数</p>
-          </div>
-        </Card>
-      </div>
+      <Card className="flex items-center gap-4">
+        <div className="w-12 h-12 rounded-full bg-court-light flex items-center justify-center">
+          <TennisBallIcon size={28} />
+        </div>
+        <div>
+          <p className="text-2xl font-bold text-court-green">{upcoming.length}</p>
+          <p className="text-xs text-gray-500">今後の予約</p>
+        </div>
+      </Card>
 
       <Card>
         <CardTitle>今後のレッスン</CardTitle>
