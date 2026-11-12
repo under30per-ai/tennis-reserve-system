@@ -128,7 +128,7 @@ async function setAuthCookie(user: AuthUser): Promise<void> {
   cookieStore.set(COOKIE_NAME, signedValue, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    sameSite: 'strict',
     maxAge: AUTH_EXPIRY_SECONDS,
     path: '/',
   });

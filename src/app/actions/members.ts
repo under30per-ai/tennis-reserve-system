@@ -171,7 +171,8 @@ export async function registerMember(data: {
 
   const existing = await getMemberByEmailInternal(data.email);
   if (existing) {
-    return { success: false, error: 'このメールアドレスは既に登録されています' };
+    // 登録済みでも同じレスポンスを返し、メール列挙攻撃を防止する
+    return { success: true, email: data.email };
   }
 
   // Delete any existing verification for this email
