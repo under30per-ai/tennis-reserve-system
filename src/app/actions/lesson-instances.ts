@@ -6,6 +6,7 @@ import { toLessonInstance, toLessonSlot, toCoach, toCourt, toReservation } from 
 import { eq, and, gte, lte, inArray } from 'drizzle-orm';
 import type { LessonInstance, LessonInstanceWithDetails, LessonSlot } from '@/domain/models';
 import { generateInstancesForSlot } from '@/lib/calendar-utils';
+import { validateDateString } from '@/lib/validators';
 import { requireAdmin, requireAuth } from '@/app/actions/auth';
 import { createNotificationInternal as createNotification } from '@/app/actions/notification-helper';
 import { checkAdminWriteLimit } from '@/lib/rate-limit';
@@ -60,6 +61,9 @@ export async function getLessonInstancesByDateRange(
   to: string
 ): Promise<LessonInstance[]> {
   await requireAuth();
+  const fromErr = validateDateString(from);
+  const toErr = validateDateString(to);
+  if (fromErr || toErr) throw new Error('日付の形式が不正です');
   const rows = await db
     .select()
     .from(lessonInstances)
@@ -185,6 +189,9 @@ export async function getInstancesWithDetailsForDateRange(
   includeCancelled = false
 ): Promise<LessonInstanceWithDetails[]> {
   await requireAuth();
+  const fromErr = validateDateString(from);
+  const toErr = validateDateString(to);
+  if (fromErr || toErr) throw new Error('日付の形式が不正です');
   const dateFilter = and(gte(lessonInstances.date, from), lte(lessonInstances.date, to));
   const rows = await db
     .select()

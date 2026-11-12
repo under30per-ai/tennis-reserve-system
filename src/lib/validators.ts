@@ -12,6 +12,8 @@ export function validateRequired(value: string, fieldName: string): string | nul
 export function validatePhone(phone: string): string | null {
   if (!phone) return null;
   if (!/^[0-9-]+$/.test(phone)) return '有効な電話番号を入力してください';
+  const digitsOnly = phone.replace(/-/g, '');
+  if (digitsOnly.length < 7 || digitsOnly.length > 15) return '電話番号は7〜15桁で入力してください';
   return null;
 }
 
@@ -30,6 +32,12 @@ export function validateTimeRange(startTime: string, endTime: string): string | 
 export function validateCapacity(capacity: number): string | null {
   if (!capacity || capacity < 1) return '定員は1以上を設定してください';
   if (capacity > 100) return '定員は100以下を設定してください';
+  return null;
+}
+
+export function validateDateString(date: string): string | null {
+  if (!date) return '日付を入力してください';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return '日付の形式が不正です (YYYY-MM-DD)';
   return null;
 }
 

@@ -128,7 +128,8 @@ export async function deleteMember(id: string): Promise<void> {
 
 export async function searchMembers(query: string): Promise<Member[]> {
   await requireAdmin();
-  const pattern = `%${query}%`;
+  const escaped = query.replace(/[%_\\]/g, '\\$&');
+  const pattern = `%${escaped}%`;
   const rows = await db
     .select()
     .from(members)
