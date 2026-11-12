@@ -180,28 +180,25 @@ export async function updateShopOrderStatus(
     if (data.status !== undefined) values.status = data.status;
     if (data.paymentStatus !== undefined) values.paymentStatus = data.paymentStatus;
 
-    const result = await db.transaction(async (tx) => {
-      // キャンセル時は在庫を戻す
-      if (data.status === 'cancelled' && existing[0].status !== 'cancelled') {
-        const itemRows = await tx
-          .select()
-          .from(shopOrderItems)
-          .where(eq(shopOrderItems.orderId, id));
-        for (const item of itemRows) {
-          await tx
-            .update(products)
-            .set({ stock: sql`${products.stock} + ${item.quantity}` })
-            .where(eq(products.id, item.productId));
-        }
+    // キャンセル時は在庫を戻す
+    if (data.status === 'cancelled' && existing[0].status !== 'cancelled') {
+      const itemRows = await db
+        .select()
+        .from(shopOrderItems)
+        .where(eq(shopOrderItems.orderId, id));
+      for (const item of itemRows) {
+        await db
+          .update(products)
+          .set({ stock: sql`${products.stock} + ${item.quantity}` })
+          .where(eq(products.id, item.productId));
       }
+    }
 
-      const rows = await tx
-        .update(shopOrders)
-        .set(values)
-        .where(eq(shopOrders.id, id))
-        .returning();
-      return rows;
-    });
+    const result = await db
+      .update(shopOrders)
+      .set(values)
+      .where(eq(shopOrders.id, id))
+      .returning();
 
     if (result.length === 0) return null;
     await writeAuditLog({ actorId: 'admin', action: 'update_status', targetType: 'shop_order', targetId: id });
@@ -274,84 +271,80 @@ export async function createShopOrder(data: {
     }
   }
 
-  const result = await db.transaction(async (tx) => {
-    // 在庫確認（トランザクション内で行いレースコンディションを防止）
-    const productIds = data.items.map((i) => i.productId);
-    const productRows = await tx
-      .select()
-      .from(products)
-      .where(sql`${products.id} = ANY(${productIds})`);
-    const productMap = new Map(productRows.map((p) => [p.id, p]));
+  // 在庫確認
+  const productIds = data.items.map((i) => i.productId);
+  const productRows = await db
+    .select()
+    .from(products)
+    .where(sql`${products.id} = ANY(${productIds})`);
+  const productMap = new Map(productRows.map((p) => [p.id, p]));
 
-    for (const item of data.items) {
-      const product = productMap.get(item.productId);
-      if (!product) throw new Error('商品が見つかりません');
-      if (!product.isActive) throw new Error(`「${product.name}」は現在販売していません`);
-      if (product.stock < item.quantity) throw new Error(`「${product.name}」の在庫が不足しています（残り${product.stock}点）`);
-    }
+  for (const item of data.items) {
+    const product = productMap.get(item.productId);
+    if (!product) throw new Error('商品が見つかりません');
+    if (!product.isActive) throw new Error(`「${product.name}」は現在販売していません`);
+    if (product.stock < item.quantity) throw new Error(`「${product.name}」の在庫が不足しています（残り${product.stock}点）`);
+  }
 
-    const orderNumber = await generateOrderNumber();
+  const orderNumber = await generateOrderNumber();
 
-    // 小計計算
-    let subtotal = 0;
-    const orderItems = data.items.map((item) => {
-      const product = productMap.get(item.productId)!;
-      const itemSubtotal = product.price * item.quantity;
-      subtotal += itemSubtotal;
-      return {
-        productId: item.productId,
-        productName: product.name,
-        unitPrice: product.price,
-        quantity: item.quantity,
-        subtotal: itemSubtotal,
-      };
-    });
-
-    const tax = Math.floor(subtotal * TAX_RATE);
-    const totalAmount = subtotal + tax;
-
-    // 注文作成
-    const orderRows = await tx
-      .insert(shopOrders)
-      .values({
-        memberId: user.memberId!,
-        orderNumber,
-        status: 'pending',
-        paymentMethod: data.paymentMethod,
-        paymentStatus: 'unpaid',
-        subtotal,
-        tax,
-        totalAmount,
-        notes: (data.notes ?? '').slice(0, 2000),
-        orderSource: 'online',
-      })
-      .returning();
-    const order = orderRows[0];
-
-    // 注文明細作成
-    for (const item of orderItems) {
-      await tx.insert(shopOrderItems).values({
-        orderId: order.id,
-        ...item,
-      });
-    }
-
-    // 在庫減少（stock >= quantity を条件に含め、負の在庫を防止）
-    for (const item of data.items) {
-      const updated = await tx
-        .update(products)
-        .set({ stock: sql`${products.stock} - ${item.quantity}` })
-        .where(and(eq(products.id, item.productId), sql`${products.stock} >= ${item.quantity}`))
-        .returning();
-      if (updated.length === 0) {
-        throw new Error('在庫が不足しています。再度お試しください。');
-      }
-    }
-
-    return order;
+  // 小計計算
+  let subtotal = 0;
+  const orderItems = data.items.map((item) => {
+    const product = productMap.get(item.productId)!;
+    const itemSubtotal = product.price * item.quantity;
+    subtotal += itemSubtotal;
+    return {
+      productId: item.productId,
+      productName: product.name,
+      unitPrice: product.price,
+      quantity: item.quantity,
+      subtotal: itemSubtotal,
+    };
   });
 
-  return toShopOrder(result);
+  const tax = Math.floor(subtotal * TAX_RATE);
+  const totalAmount = subtotal + tax;
+
+  // 在庫減少（stock >= quantity ガードで負の在庫を防止）
+  for (const item of data.items) {
+    const updated = await db
+      .update(products)
+      .set({ stock: sql`${products.stock} - ${item.quantity}` })
+      .where(and(eq(products.id, item.productId), sql`${products.stock} >= ${item.quantity}`))
+      .returning();
+    if (updated.length === 0) {
+      throw new Error('在庫が不足しています。再度お試しください。');
+    }
+  }
+
+  // 注文作成
+  const orderRows = await db
+    .insert(shopOrders)
+    .values({
+      memberId: user.memberId!,
+      orderNumber,
+      status: 'pending',
+      paymentMethod: data.paymentMethod,
+      paymentStatus: 'unpaid',
+      subtotal,
+      tax,
+      totalAmount,
+      notes: (data.notes ?? '').slice(0, 2000),
+      orderSource: 'online',
+    })
+    .returning();
+  const order = orderRows[0];
+
+  // 注文明細作成
+  for (const item of orderItems) {
+    await db.insert(shopOrderItems).values({
+      orderId: order.id,
+      ...item,
+    });
+  }
+
+  return toShopOrder(order);
 }
 
 export async function getMyShopOrders(): Promise<ShopOrder[]> {
@@ -399,27 +392,24 @@ export async function cancelMyShopOrder(orderId: string): Promise<ShopOrder> {
   const order = orderRows[0];
   if (order.status !== 'pending') throw new Error('この注文はキャンセルできません（注文受付状態のみキャンセル可能）');
 
-  const result = await db.transaction(async (tx) => {
-    // 在庫戻し
-    const itemRows = await tx
-      .select()
-      .from(shopOrderItems)
-      .where(eq(shopOrderItems.orderId, orderId));
-    for (const item of itemRows) {
-      await tx
-        .update(products)
-        .set({ stock: sql`${products.stock} + ${item.quantity}` })
-        .where(eq(products.id, item.productId));
-    }
+  // 在庫戻し
+  const itemRows = await db
+    .select()
+    .from(shopOrderItems)
+    .where(eq(shopOrderItems.orderId, orderId));
+  for (const item of itemRows) {
+    await db
+      .update(products)
+      .set({ stock: sql`${products.stock} + ${item.quantity}` })
+      .where(eq(products.id, item.productId));
+  }
 
-    // ステータス更新
-    const rows = await tx
-      .update(shopOrders)
-      .set({ status: 'cancelled', updatedAt: new Date() })
-      .where(eq(shopOrders.id, orderId))
-      .returning();
-    return rows[0];
-  });
+  // ステータス更新
+  const rows = await db
+    .update(shopOrders)
+    .set({ status: 'cancelled', updatedAt: new Date() })
+    .where(eq(shopOrders.id, orderId))
+    .returning();
 
-  return toShopOrder(result);
+  return toShopOrder(rows[0]);
 }
