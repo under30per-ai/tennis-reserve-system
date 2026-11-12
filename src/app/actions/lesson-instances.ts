@@ -10,10 +10,11 @@ import { validateDateString } from '@/lib/validators';
 import { requireAdmin, requireAuth } from '@/app/actions/auth';
 import { createNotificationInternal as createNotification } from '@/app/actions/notification-helper';
 import { checkAdminWriteLimit } from '@/lib/rate-limit';
+import { writeAuditLog } from '@/lib/audit-log';
 
 export async function getLessonInstances(): Promise<LessonInstance[]> {
   await requireAuth();
-  const rows = await db.select().from(lessonInstances);
+  const rows = await db.select().from(lessonInstances).limit(5000);
   return rows.map(toLessonInstance);
 }
 
@@ -111,6 +112,7 @@ export async function getLessonInstanceWithDetails(
 export async function cancelLessonInstance(id: string, reason: string): Promise<void> {
   await requireAdmin();
   await checkAdminWriteLimit();
+  await writeAuditLog({ actorId: 'admin', action: 'cancel', targetType: 'lessonInstance', targetId: id, details: `レッスンキャンセル: ${reason}` });
   await db
     .update(lessonInstances)
     .set({ isCancelled: true, cancelReason: reason })

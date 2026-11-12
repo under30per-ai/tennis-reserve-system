@@ -10,7 +10,7 @@ import { checkAdminWriteLimit } from '@/lib/rate-limit';
 
 export async function getCourts(): Promise<Court[]> {
   await requireAuth();
-  const rows = await db.select().from(courts);
+  const rows = await db.select().from(courts).limit(500);
   return rows.map(toCourt);
 }
 

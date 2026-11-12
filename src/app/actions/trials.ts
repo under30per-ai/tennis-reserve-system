@@ -8,6 +8,7 @@ import type { TrialApplication, TrialStatus, LessonLevel } from '@/domain/models
 import { requireAdmin } from '@/app/actions/auth';
 import { sendTrialConfirmation, sendTrialStatusUpdate } from '@/lib/email';
 import { checkRateLimit, checkAdminWriteLimit } from '@/lib/rate-limit';
+import { writeAuditLog } from '@/lib/audit-log';
 
 export async function applyForTrial(data: {
   name: string;
@@ -107,6 +108,8 @@ export async function updateTrialStatus(
 
   if (rows.length === 0) return null;
   const application = toTrialApplication(rows[0]);
+
+  await writeAuditLog({ actorId: 'admin', action: 'updateStatus', targetType: 'trialApplication', targetId: id, details: `体験申込ステータス変更: ${status}` });
 
   try {
     await sendTrialStatusUpdate(application.email, application.name, status);

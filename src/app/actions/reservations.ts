@@ -25,7 +25,7 @@ import { unstable_cache, revalidateTag } from 'next/cache';
 
 export async function getReservations(): Promise<Reservation[]> {
   await requireAdmin();
-  const rows = await db.select().from(reservations);
+  const rows = await db.select().from(reservations).limit(5000);
   return rows.map(toReservation);
 }
 
@@ -357,7 +357,8 @@ export async function getAllReservationsWithDetails(): Promise<
     .innerJoin(lessonSlots, eq(lessonInstances.lessonSlotId, lessonSlots.id))
     .innerJoin(members, eq(reservations.memberId, members.id))
     .innerJoin(coaches, eq(lessonInstances.coachId, coaches.id))
-    .innerJoin(courts, eq(lessonInstances.courtId, courts.id));
+    .innerJoin(courts, eq(lessonInstances.courtId, courts.id))
+    .limit(5000);
 
   return rows
     .map((row) => ({

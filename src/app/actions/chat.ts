@@ -70,7 +70,8 @@ export async function getConversation(partnerId: string): Promise<ChatMessage[]>
         and(eq(chatMessages.senderId, partnerId), eq(chatMessages.receiverId, myId))
       )
     )
-    .orderBy(chatMessages.createdAt);
+    .orderBy(chatMessages.createdAt)
+    .limit(500);
   return rows.map(toChatMessage);
 }
 
@@ -84,7 +85,8 @@ export async function getConversationList(): Promise<ChatThread[]> {
     .where(
       or(eq(chatMessages.senderId, myId), eq(chatMessages.receiverId, myId))
     )
-    .orderBy(desc(chatMessages.createdAt));
+    .orderBy(desc(chatMessages.createdAt))
+    .limit(1000);
 
   const messages = rows.map(toChatMessage);
   const threadMap = new Map<string, { messages: ChatMessage[]; unread: number }>();

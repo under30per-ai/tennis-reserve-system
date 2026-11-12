@@ -11,6 +11,7 @@ import { sendVerificationCode } from '@/lib/email';
 import { validateEmail, validateRequired, validatePhone, validatePassword } from '@/lib/validators';
 import { hashPassword } from '@/lib/password';
 import { checkRateLimit, checkAdminWriteLimit } from '@/lib/rate-limit';
+import { writeAuditLog } from '@/lib/audit-log';
 import { requireAdmin, requireAuth } from '@/app/actions/auth';
 import { unstable_cache, revalidateTag } from 'next/cache';
 
@@ -18,7 +19,7 @@ const MAX_OTP_ATTEMPTS = 5;
 
 export async function getMembers(): Promise<Member[]> {
   await requireAdmin();
-  const rows = await db.select().from(members);
+  const rows = await db.select().from(members).limit(1000);
   return rows.map(toMember);
 }
 
@@ -89,7 +90,9 @@ export async function createMember(
 ): Promise<Member> {
   await requireAdmin();
   await checkAdminWriteLimit();
-  return createMemberInternal(data);
+  const member = await createMemberInternal(data);
+  await writeAuditLog({ actorId: 'admin', action: 'create', targetType: 'member', targetId: member.id, details: `会員作成: ${data.name}` });
+  return member;
 }
 
 export async function updateMember(id: string, data: Partial<Member> & { password?: string }): Promise<Member | null> {
@@ -111,6 +114,9 @@ export async function updateMember(id: string, data: Partial<Member> & { passwor
 
   const rows = await db.update(members).set(values).where(eq(members.id, id)).returning();
   revalidateTag(`member:${id}`, 'max');
+  if (rows.length > 0) {
+    await writeAuditLog({ actorId: 'admin', action: 'update', targetType: 'member', targetId: id, details: `会員更新: ${Object.keys(values).join(', ')}` });
+  }
   return rows.length > 0 ? toMember(rows[0]) : null;
 }
 
@@ -124,6 +130,7 @@ export async function deleteMember(id: string): Promise<void> {
   // 他の関連テーブル(reservations, notifications, memberTickets, eventRegistrations)は
   // ON DELETE CASCADEで自動削除される
   await db.delete(members).where(eq(members.id, id));
+  await writeAuditLog({ actorId: 'admin', action: 'delete', targetType: 'member', targetId: id });
 }
 
 export async function searchMembers(query: string): Promise<Member[]> {

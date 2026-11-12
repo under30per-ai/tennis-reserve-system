@@ -327,6 +327,22 @@ export const eventRegistrations = pgTable('event_registrations', {
 
 // ── Chat ──────────────────────────────────────────────
 
+// ── Audit Logs ───────────────────────────────────────
+
+export const auditLogs = pgTable('audit_logs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  actorId: varchar('actor_id', { length: 255 }).notNull(),
+  action: varchar('action', { length: 100 }).notNull(),
+  targetType: varchar('target_type', { length: 100 }).notNull(),
+  targetId: varchar('target_id', { length: 255 }),
+  details: varchar('details', { length: 2000 }).notNull().default(''),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index('idx_audit_logs_actor').on(table.actorId),
+  index('idx_audit_logs_action').on(table.action),
+  index('idx_audit_logs_created').on(table.createdAt),
+]);
+
 // ── Rate Limits ──────────────────────────────────────
 
 export const rateLimits = pgTable('rate_limits', {

@@ -29,7 +29,7 @@ import { checkAdminWriteLimit } from '@/lib/rate-limit';
 
 export async function getLessonRecords(): Promise<LessonRecord[]> {
   await requireAdmin();
-  const rows = await db.select().from(lessonRecords);
+  const rows = await db.select().from(lessonRecords).limit(5000);
   return rows.map(toLessonRecord);
 }
 

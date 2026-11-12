@@ -7,12 +7,13 @@ import { eq, and, desc } from 'drizzle-orm';
 import type { TicketType, MemberTicket, MemberTicketWithType, TicketUsage } from '@/domain/models';
 import { requireAdmin, requireAuth } from '@/app/actions/auth';
 import { checkAdminWriteLimit } from '@/lib/rate-limit';
+import { writeAuditLog } from '@/lib/audit-log';
 
 // ── Admin: Ticket Type CRUD ───────────────────────────
 
 export async function getTicketTypes(): Promise<TicketType[]> {
   await requireAuth();
-  const rows = await db.select().from(ticketTypes).orderBy(desc(ticketTypes.createdAt));
+  const rows = await db.select().from(ticketTypes).orderBy(desc(ticketTypes.createdAt)).limit(500);
   return rows.map(toTicketType);
 }
 
@@ -96,7 +97,9 @@ export async function issueMemberTicket(
       expiresAt,
     })
     .returning();
-  return toMemberTicket(rows[0]);
+  const ticket = toMemberTicket(rows[0]);
+  await writeAuditLog({ actorId: 'admin', action: 'issue', targetType: 'memberTicket', targetId: ticket.id, details: `チケット発行: ${ticketType.name} → 会員${memberId}` });
+  return ticket;
 }
 
 export async function getAllMemberTickets(): Promise<MemberTicketWithType[]> {

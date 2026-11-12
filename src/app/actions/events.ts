@@ -8,12 +8,13 @@ import type { Event, EventRegistration, EventWithDetails, LessonLevel } from '@/
 import { requireAdmin, requireAuth } from '@/app/actions/auth';
 import { createNotificationInternal as createNotification } from '@/app/actions/notification-helper';
 import { checkAdminWriteLimit } from '@/lib/rate-limit';
+import { writeAuditLog } from '@/lib/audit-log';
 
 // ── Admin CRUD ────────────────────────────────────────
 
 export async function getEvents(): Promise<Event[]> {
   await requireAuth();
-  const rows = await db.select().from(events).orderBy(desc(events.eventDate));
+  const rows = await db.select().from(events).orderBy(desc(events.eventDate)).limit(1000);
   return rows.map(toEvent);
 }
 
@@ -121,6 +122,7 @@ export async function deleteEvent(id: string): Promise<void> {
   await checkAdminWriteLimit();
   await db.delete(eventRegistrations).where(eq(eventRegistrations.eventId, id));
   await db.delete(events).where(eq(events.id, id));
+  await writeAuditLog({ actorId: 'admin', action: 'delete', targetType: 'event', targetId: id });
 }
 
 // ── Event details with registrations ──────────────────
