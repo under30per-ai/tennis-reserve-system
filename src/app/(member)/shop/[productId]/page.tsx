@@ -38,6 +38,7 @@ export default function ProductDetailPage() {
     if (!product) return;
     addToCart(product, quantity);
     toast.success('カートに追加しました');
+    router.back();
   };
 
   if (loading || !product) return <LoadingSpinner />;
