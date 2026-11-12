@@ -7,7 +7,7 @@ import { eq, desc } from 'drizzle-orm';
 import type { TrialApplication, TrialStatus, LessonLevel } from '@/domain/models';
 import { requireAdmin } from '@/app/actions/auth';
 import { sendTrialConfirmation, sendTrialStatusUpdate } from '@/lib/email';
-import { checkRateLimit } from '@/lib/rate-limit';
+import { checkRateLimit, checkAdminWriteLimit } from '@/lib/rate-limit';
 
 export async function applyForTrial(data: {
   name: string;
@@ -92,6 +92,7 @@ export async function updateTrialStatus(
   adminNotes?: string
 ): Promise<TrialApplication | null> {
   await requireAdmin();
+  await checkAdminWriteLimit();
   const values: Record<string, unknown> = {
     status,
     reviewedAt: new Date(),

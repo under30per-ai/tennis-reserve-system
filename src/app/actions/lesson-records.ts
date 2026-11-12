@@ -25,6 +25,7 @@ import type {
   Reservation,
 } from '@/domain/models';
 import { requireAdmin, requireAuth } from '@/app/actions/auth';
+import { checkAdminWriteLimit } from '@/lib/rate-limit';
 
 export async function getLessonRecords(): Promise<LessonRecord[]> {
   await requireAdmin();
@@ -36,6 +37,7 @@ export async function createLessonRecord(
   data: Omit<LessonRecord, 'id' | 'createdAt' | 'updatedAt'>
 ): Promise<LessonRecord> {
   await requireAdmin();
+  await checkAdminWriteLimit();
   const existing = await db
     .select()
     .from(lessonRecords)
@@ -59,6 +61,7 @@ export async function updateLessonRecord(
   data: Partial<LessonRecord>
 ): Promise<LessonRecord | null> {
   await requireAdmin();
+  await checkAdminWriteLimit();
   const values: Record<string, unknown> = { updatedAt: new Date() };
   if (data.theme !== undefined) values.theme = data.theme;
   if (data.content !== undefined) values.content = data.content;

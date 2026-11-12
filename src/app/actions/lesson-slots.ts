@@ -6,6 +6,7 @@ import { toLessonSlot } from '@/db/mappers';
 import { eq } from 'drizzle-orm';
 import type { LessonSlot } from '@/domain/models';
 import { requireAdmin, requireAuth } from '@/app/actions/auth';
+import { checkAdminWriteLimit } from '@/lib/rate-limit';
 
 export async function getLessonSlots(): Promise<LessonSlot[]> {
   await requireAuth();
@@ -23,6 +24,7 @@ export async function createLessonSlot(
   data: Omit<LessonSlot, 'id' | 'createdAt' | 'updatedAt'>
 ): Promise<LessonSlot> {
   await requireAdmin();
+  await checkAdminWriteLimit();
   const rows = await db
     .insert(lessonSlots)
     .values({
@@ -51,6 +53,7 @@ export async function updateLessonSlot(
   data: Partial<LessonSlot>
 ): Promise<LessonSlot | null> {
   await requireAdmin();
+  await checkAdminWriteLimit();
   const values: Record<string, unknown> = { updatedAt: new Date() };
   if (data.title !== undefined) values.title = data.title;
   if (data.level !== undefined) values.level = data.level;
@@ -74,5 +77,6 @@ export async function updateLessonSlot(
 
 export async function deleteLessonSlot(id: string): Promise<void> {
   await requireAdmin();
+  await checkAdminWriteLimit();
   await db.delete(lessonSlots).where(eq(lessonSlots.id, id));
 }

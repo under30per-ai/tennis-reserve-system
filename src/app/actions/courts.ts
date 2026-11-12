@@ -6,6 +6,7 @@ import { toCourt } from '@/db/mappers';
 import { eq } from 'drizzle-orm';
 import type { Court } from '@/domain/models';
 import { requireAdmin, requireAuth } from '@/app/actions/auth';
+import { checkAdminWriteLimit } from '@/lib/rate-limit';
 
 export async function getCourts(): Promise<Court[]> {
   await requireAuth();
@@ -21,6 +22,7 @@ export async function getCourtById(id: string): Promise<Court | null> {
 
 export async function createCourt(data: Omit<Court, 'id'>): Promise<Court> {
   await requireAdmin();
+  await checkAdminWriteLimit();
   const rows = await db
     .insert(courts)
     .values({
@@ -36,6 +38,7 @@ export async function createCourt(data: Omit<Court, 'id'>): Promise<Court> {
 
 export async function updateCourt(id: string, data: Partial<Court>): Promise<Court | null> {
   await requireAdmin();
+  await checkAdminWriteLimit();
   const values: Record<string, unknown> = {};
   if (data.name !== undefined) values.name = data.name;
   if (data.type !== undefined) values.type = data.type;
@@ -49,5 +52,6 @@ export async function updateCourt(id: string, data: Partial<Court>): Promise<Cou
 
 export async function deleteCourt(id: string): Promise<void> {
   await requireAdmin();
+  await checkAdminWriteLimit();
   await db.delete(courts).where(eq(courts.id, id));
 }

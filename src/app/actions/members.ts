@@ -10,7 +10,7 @@ import { getRandomAvatarColor } from '@/lib/utils';
 import { sendVerificationCode } from '@/lib/email';
 import { validateEmail, validateRequired, validatePhone, validatePassword } from '@/lib/validators';
 import { hashPassword } from '@/lib/password';
-import { checkRateLimit } from '@/lib/rate-limit';
+import { checkRateLimit, checkAdminWriteLimit } from '@/lib/rate-limit';
 import { requireAdmin, requireAuth } from '@/app/actions/auth';
 import { unstable_cache, revalidateTag } from 'next/cache';
 
@@ -88,11 +88,13 @@ export async function createMember(
   data: Omit<Member, 'id' | 'createdAt' | 'updatedAt' | 'avatarColor'> & { password: string }
 ): Promise<Member> {
   await requireAdmin();
+  await checkAdminWriteLimit();
   return createMemberInternal(data);
 }
 
 export async function updateMember(id: string, data: Partial<Member> & { password?: string }): Promise<Member | null> {
   await requireAdmin();
+  await checkAdminWriteLimit();
   const values: Record<string, unknown> = { updatedAt: new Date() };
   if (data.name !== undefined) values.name = data.name;
   if (data.nameKana !== undefined) values.nameKana = data.nameKana;
@@ -114,6 +116,7 @@ export async function updateMember(id: string, data: Partial<Member> & { passwor
 
 export async function deleteMember(id: string): Promise<void> {
   await requireAdmin();
+  await checkAdminWriteLimit();
   // chatMessagesはvarchar型のFKのためCASCADEが効かない→手動削除
   await db.delete(chatMessages).where(
     or(eq(chatMessages.senderId, id), eq(chatMessages.receiverId, id))
@@ -175,23 +178,24 @@ export async function registerMember(data: {
     return { success: true, email: data.email };
   }
 
-  // Delete any existing verification for this email
-  await db.delete(emailVerifications).where(eq(emailVerifications.email, data.email));
-
   const code = String(randomInt(100000, 999999));
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
   // Hash the password before storing in the verification table
   const hashedPassword = await hashPassword(data.password);
 
-  await db.insert(emailVerifications).values({
-    email: data.email,
-    code,
-    name: data.name,
-    nameKana: data.nameKana,
-    phone: data.phone,
-    password: hashedPassword,
-    expiresAt,
+  // トランザクションで既存レコード削除→新規挿入を原子的に実行
+  await db.transaction(async (tx) => {
+    await tx.delete(emailVerifications).where(eq(emailVerifications.email, data.email));
+    await tx.insert(emailVerifications).values({
+      email: data.email,
+      code,
+      name: data.name,
+      nameKana: data.nameKana,
+      phone: data.phone,
+      password: hashedPassword,
+      expiresAt,
+    });
   });
 
   try {
@@ -246,9 +250,12 @@ export async function verifyEmail(data: {
     .where(eq(emailVerifications.id, verification.id));
 
   // Timing-safe comparison to prevent timing attacks on OTP
+  if (data.code.length !== verification.code.length) {
+    return { success: false, error: '認証コードが正しくありません。' };
+  }
   const codeBuf = Buffer.from(verification.code);
-  const inputBuf = Buffer.from(data.code.padEnd(verification.code.length));
-  if (codeBuf.length !== inputBuf.length || !timingSafeEqual(codeBuf, inputBuf)) {
+  const inputBuf = Buffer.from(data.code);
+  if (!timingSafeEqual(codeBuf, inputBuf)) {
     return { success: false, error: '認証コードが正しくありません。' };
   }
 

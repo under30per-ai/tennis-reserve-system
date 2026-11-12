@@ -8,6 +8,7 @@ import type { LessonInstance, LessonInstanceWithDetails, LessonSlot } from '@/do
 import { generateInstancesForSlot } from '@/lib/calendar-utils';
 import { requireAdmin, requireAuth } from '@/app/actions/auth';
 import { createNotificationInternal as createNotification } from '@/app/actions/notification-helper';
+import { checkAdminWriteLimit } from '@/lib/rate-limit';
 
 export async function getLessonInstances(): Promise<LessonInstance[]> {
   await requireAuth();
@@ -26,6 +27,7 @@ export async function updateLessonInstance(
   data: Partial<LessonInstance>
 ): Promise<LessonInstance | null> {
   await requireAdmin();
+  await checkAdminWriteLimit();
   const values: Record<string, unknown> = {};
   if (data.coachId !== undefined) values.coachId = data.coachId;
   if (data.courtId !== undefined) values.courtId = data.courtId;
@@ -104,6 +106,7 @@ export async function getLessonInstanceWithDetails(
 
 export async function cancelLessonInstance(id: string, reason: string): Promise<void> {
   await requireAdmin();
+  await checkAdminWriteLimit();
   await db
     .update(lessonInstances)
     .set({ isCancelled: true, cancelReason: reason })
@@ -144,6 +147,7 @@ export async function generateLessonInstances(
   toDate: Date
 ): Promise<LessonInstance[]> {
   await requireAdmin();
+  await checkAdminWriteLimit();
   const generated = generateInstancesForSlot(slot, fromDate, toDate);
   if (generated.length === 0) return [];
 

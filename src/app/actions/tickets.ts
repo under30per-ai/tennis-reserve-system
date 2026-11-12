@@ -6,6 +6,7 @@ import { toTicketType, toMemberTicket, toTicketUsage } from '@/db/mappers';
 import { eq, and, desc } from 'drizzle-orm';
 import type { TicketType, MemberTicket, MemberTicketWithType, TicketUsage } from '@/domain/models';
 import { requireAdmin, requireAuth } from '@/app/actions/auth';
+import { checkAdminWriteLimit } from '@/lib/rate-limit';
 
 // ── Admin: Ticket Type CRUD ───────────────────────────
 
@@ -29,6 +30,7 @@ export async function createTicketType(data: {
   price: number;
 }): Promise<TicketType> {
   await requireAdmin();
+  await checkAdminWriteLimit();
   const rows = await db
     .insert(ticketTypes)
     .values({
@@ -47,6 +49,7 @@ export async function updateTicketType(
   data: Partial<{ name: string; description: string; lessonCount: number; validDays: number; price: number; isActive: boolean }>
 ): Promise<TicketType | null> {
   await requireAdmin();
+  await checkAdminWriteLimit();
   const values: Record<string, unknown> = {};
   if (data.name !== undefined) values.name = data.name;
   if (data.description !== undefined) values.description = data.description;
@@ -65,6 +68,7 @@ export async function updateTicketType(
 
 export async function deleteTicketType(id: string): Promise<void> {
   await requireAdmin();
+  await checkAdminWriteLimit();
   await db.update(ticketTypes).set({ isActive: false }).where(eq(ticketTypes.id, id));
 }
 
@@ -75,6 +79,7 @@ export async function issueMemberTicket(
   ticketTypeId: string
 ): Promise<MemberTicket> {
   await requireAdmin();
+  await checkAdminWriteLimit();
   const typeRows = await db.select().from(ticketTypes).where(eq(ticketTypes.id, ticketTypeId));
   if (typeRows.length === 0) throw new Error('チケット種別が見つかりません');
   const ticketType = toTicketType(typeRows[0]);

@@ -74,3 +74,16 @@ export async function checkRateLimit(
 
   return { allowed: true, remaining: maxAttempts - 1 };
 }
+
+/**
+ * Rate limit for admin write operations.
+ * 100 mutations per hour across all admin actions.
+ * Throws if the limit is exceeded.
+ */
+export async function checkAdminWriteLimit(): Promise<void> {
+  const rl = await checkRateLimit('admin', 'adminWrite', 100, 60 * 60 * 1000);
+  if (!rl.allowed) {
+    const minutes = Math.ceil(rl.retryAfterMs / 60000);
+    throw new Error(`管理者操作の上限に達しました。${minutes}分後に再度お試しください。`);
+  }
+}

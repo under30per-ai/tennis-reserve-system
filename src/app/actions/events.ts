@@ -7,6 +7,7 @@ import { eq, and, desc, gte, inArray } from 'drizzle-orm';
 import type { Event, EventRegistration, EventWithDetails, LessonLevel } from '@/domain/models';
 import { requireAdmin, requireAuth } from '@/app/actions/auth';
 import { createNotificationInternal as createNotification } from '@/app/actions/notification-helper';
+import { checkAdminWriteLimit } from '@/lib/rate-limit';
 
 // ── Admin CRUD ────────────────────────────────────────
 
@@ -35,6 +36,7 @@ export async function createEvent(data: {
   isPublished: boolean;
 }): Promise<Event> {
   await requireAdmin();
+  await checkAdminWriteLimit();
   const rows = await db
     .insert(events)
     .values({
@@ -75,6 +77,7 @@ export async function updateEvent(
   }>
 ): Promise<Event | null> {
   await requireAdmin();
+  await checkAdminWriteLimit();
 
   // Check if we need to notify (publishing for first time)
   let shouldNotify = false;
@@ -115,6 +118,7 @@ export async function updateEvent(
 
 export async function deleteEvent(id: string): Promise<void> {
   await requireAdmin();
+  await checkAdminWriteLimit();
   await db.delete(eventRegistrations).where(eq(eventRegistrations.eventId, id));
   await db.delete(events).where(eq(events.id, id));
 }

@@ -145,7 +145,11 @@ export async function markMessagesAsRead(partnerId: string): Promise<void> {
 }
 
 export async function getPartnerName(partnerId: string): Promise<string> {
-  await requireAuth();
+  const user = await requireAuth();
+  // 会員は管理者名のみ取得可能、管理者は任意の会員名を取得可能
+  if (user.role !== 'admin' && partnerId !== 'admin') {
+    throw new Error('権限がありません');
+  }
   if (partnerId === 'admin') return '管理者';
   const rows = await db.select({ name: members.name }).from(members).where(eq(members.id, partnerId));
   return rows.length > 0 ? rows[0].name : '不明';

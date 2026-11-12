@@ -7,6 +7,7 @@ import { eq } from 'drizzle-orm';
 import type { Coach } from '@/domain/models';
 import { getRandomAvatarColor } from '@/lib/utils';
 import { requireAdmin, requireAuth } from '@/app/actions/auth';
+import { checkAdminWriteLimit } from '@/lib/rate-limit';
 
 export async function getCoaches(): Promise<Coach[]> {
   await requireAuth();
@@ -24,6 +25,7 @@ export async function createCoach(
   data: Omit<Coach, 'id' | 'createdAt' | 'updatedAt' | 'avatarColor'>
 ): Promise<Coach> {
   await requireAdmin();
+  await checkAdminWriteLimit();
   const rows = await db
     .insert(coaches)
     .values({
@@ -43,6 +45,7 @@ export async function createCoach(
 
 export async function updateCoach(id: string, data: Partial<Coach>): Promise<Coach | null> {
   await requireAdmin();
+  await checkAdminWriteLimit();
   const values: Record<string, unknown> = { updatedAt: new Date() };
   if (data.name !== undefined) values.name = data.name;
   if (data.nameKana !== undefined) values.nameKana = data.nameKana;
@@ -60,5 +63,6 @@ export async function updateCoach(id: string, data: Partial<Coach>): Promise<Coa
 
 export async function deleteCoach(id: string): Promise<void> {
   await requireAdmin();
+  await checkAdminWriteLimit();
   await db.delete(coaches).where(eq(coaches.id, id));
 }
