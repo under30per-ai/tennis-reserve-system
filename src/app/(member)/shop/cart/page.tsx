@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import useShop from '@/hooks/useShop';
 import useToast from '@/hooks/useToast';
 import Card from '@/components/ui/Card';
@@ -42,6 +43,7 @@ export default function CartPage() {
   if (cart.length === 0) {
     return (
       <div className="space-y-4">
+        <Link href="/shop" className="text-sm text-gray-500 hover:text-net-gray">&larr; ショップへ戻る</Link>
         <h1 className="text-lg font-bold text-net-dark">カート</h1>
         <EmptyState
           title="カートは空です"
@@ -54,6 +56,7 @@ export default function CartPage() {
 
   return (
     <div className="space-y-4">
+      <Link href="/shop" className="text-sm text-gray-500 hover:text-net-gray">&larr; ショップへ戻る</Link>
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-bold text-net-dark">カート ({cartItemCount}点)</h1>
         <button onClick={clearCart} className="text-sm text-red-500 hover:text-red-700">
