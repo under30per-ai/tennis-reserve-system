@@ -6,6 +6,7 @@ import { toChatMessage, toMember } from '@/db/mappers';
 import { eq, and, or, desc, count } from 'drizzle-orm';
 import type { ChatMessage, ChatThread, SenderRole } from '@/domain/models';
 import { requireAuth } from '@/app/actions/auth';
+import { containsProhibitedContent } from '@/lib/content-filter';
 
 export async function sendMessage(
   receiverId: string,
@@ -19,6 +20,11 @@ export async function sendMessage(
   }
   if (message.length > 5000) {
     throw new Error('メッセージは5000文字以内で入力してください');
+  }
+
+  // 不適切なコンテンツのフィルタリング
+  if (containsProhibitedContent(message)) {
+    throw new Error('不適切な表現が含まれています。内容を修正してください。');
   }
 
   const senderId = user.role === 'admin' ? 'admin' : user.memberId!;
