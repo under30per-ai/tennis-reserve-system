@@ -7,7 +7,7 @@ import { useMemberData } from '@/contexts/MemberDataContext';
 import useLessonInstances from '@/hooks/useLessonInstances';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
-import { LevelBadge } from '@/components/ui/Badge';
+import Badge, { LevelBadge } from '@/components/ui/Badge';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { getWeekDays, formatWeekRange } from '@/lib/calendar-utils';
 import { DAY_LABELS } from '@/lib/constants';
@@ -76,10 +76,7 @@ export default function ReservePage() {
           const dateStr = toISODateString(day);
           const now = new Date();
           const nowTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-          const instances = (instancesByDate[dateStr] ?? []).filter(inst =>
-            !reservedInstanceIds.has(inst.id) &&
-            !(isToday(day) && inst.startTime <= nowTime)
-          );
+          const instances = instancesByDate[dateStr] ?? [];
           const today = isToday(day);
           return (
             <div key={dateStr}>
@@ -95,18 +92,23 @@ export default function ReservePage() {
               ) : (
                 <div className="ml-10 space-y-2">
                   {instances.map(inst => {
+                    const isPastTime = day < new Date(now.getFullYear(), now.getMonth(), now.getDate()) || (today && inst.startTime <= nowTime);
+                    const isReserved = reservedInstanceIds.has(inst.id);
+                    const disabled = isPastTime || isReserved;
                     const avail = getAvailabilityLabel(inst.availableSpots, inst.maxCapacity);
                     return (
-                      <Card key={inst.id} className="cursor-pointer hover:border-court-grass/50" onClick={() => router.push(`/reserve/${inst.id}`)}>
+                      <Card key={inst.id} className={disabled ? 'opacity-50' : 'cursor-pointer hover:border-court-grass/50'} onClick={disabled ? undefined : () => router.push(`/reserve/${inst.id}`)}>
                         <div className="flex items-start gap-2 md:gap-3">
                           <div className="text-center min-w-10 md:min-w-12 flex-shrink-0">
-                            <p className="text-sm md:text-base font-bold text-court-green">{inst.startTime}</p>
+                            <p className={`text-sm md:text-base font-bold ${disabled ? 'text-gray-400' : 'text-court-green'}`}>{inst.startTime}</p>
                             <p className="text-xs text-gray-400">{inst.endTime}</p>
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5 md:gap-2">
                               <p className="text-sm md:text-base font-medium truncate md:truncate-none">{inst.lessonSlot.title}</p>
                               <LevelBadge level={inst.lessonSlot.level} className="flex-shrink-0" />
+                              {isPastTime && <Badge variant="default">終了</Badge>}
+                              {isReserved && !isPastTime && <Badge variant="success">予約済み</Badge>}
                             </div>
                             <div className="flex items-center justify-between mt-1">
                               <p className="text-xs md:text-sm text-gray-500 truncate">{inst.coach.name} / {inst.court.name}</p>
