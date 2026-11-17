@@ -9,7 +9,9 @@ interface ChatInputProps {
 export default function ChatInput({ onSend }: ChatInputProps) {
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // テキストエリアの高さを自動調整
   useEffect(() => {
@@ -19,13 +21,26 @@ export default function ChatInput({ onSend }: ChatInputProps) {
     el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
   }, [message]);
 
+  // エラータイマーのクリーンアップ
+  useEffect(() => {
+    return () => {
+      if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+    };
+  }, []);
+
   const handleSend = async () => {
     const text = message.trim();
     if (!text || sending) return;
     setSending(true);
+    setError(null);
     try {
       await onSend(text);
       setMessage('');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : '送信に失敗しました';
+      setError(msg);
+      if (errorTimerRef.current) clearTimeout(errorTimerRef.current);
+      errorTimerRef.current = setTimeout(() => setError(null), 5000);
     } finally {
       setSending(false);
       textareaRef.current?.focus();
@@ -47,7 +62,11 @@ export default function ChatInput({ onSend }: ChatInputProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="flex items-end gap-2 p-3 border-t bg-white">
+    <form onSubmit={handleSubmit} noValidate className="border-t bg-white">
+      {error && (
+        <p className="px-3 pt-2 text-xs text-red-600">{error}</p>
+      )}
+      <div className="flex items-end gap-2 p-3">
       <textarea
         ref={textareaRef}
         value={message}
@@ -67,6 +86,7 @@ export default function ChatInput({ onSend }: ChatInputProps) {
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
         </svg>
       </button>
+      </div>
     </form>
   );
 }

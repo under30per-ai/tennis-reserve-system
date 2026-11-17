@@ -38,6 +38,7 @@ export default function MemberConversationPage() {
       </div>
 
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        <p className="text-center text-xs text-gray-400">不適切な表現を含むメッセージは送信できません。</p>
         {messages.length === 0 && (
           <p className="text-center text-sm text-gray-400 mt-8">メッセージを送信してください</p>
         )}
