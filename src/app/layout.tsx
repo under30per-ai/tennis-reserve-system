@@ -17,8 +17,8 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&display=swap"
           rel="stylesheet"
         />
-        <title>テニススクール予約管理システム</title>
-        <meta name="description" content="テニススクールのレッスン予約管理システム" />
+        <title>Love-All 予約管理システム</title>
+        <meta name="description" content="Love-All のレッスン予約管理システム" />
       </head>
       <body className="min-h-full flex flex-col">
         <AuthProvider>

@@ -22,7 +22,7 @@ export default function MemberHeader() {
           <div className="bg-court-green rounded-full p-1.5">
             <TennisBallIcon size={20} />
           </div>
-          <span className="font-bold text-net-dark text-sm">テニススクール</span>
+          <span className="font-bold text-net-dark text-sm">Love-All</span>
         </div>
 
         <div className="flex items-center gap-3">

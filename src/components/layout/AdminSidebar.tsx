@@ -61,7 +61,7 @@ export default function AdminSidebar() {
             <TennisBallIcon size={24} />
           </div>
           <div>
-            <p className="font-bold text-sm">テニススクール</p>
+            <p className="font-bold text-sm">Love-All</p>
             <p className="text-xs text-white/60">管理画面</p>
           </div>
         </div>

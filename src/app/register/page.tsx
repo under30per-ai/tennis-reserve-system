@@ -123,7 +123,7 @@ export default function RegisterPage() {
             </div>
           </div>
           <h1 className="text-2xl font-bold text-net-dark">新規会員登録</h1>
-          <p className="text-sm text-gray-500 mt-1">テニススクール予約管理システム</p>
+          <p className="text-sm text-gray-500 mt-1">Love-All 予約管理システム</p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-xl border border-court-grass/10 overflow-hidden">

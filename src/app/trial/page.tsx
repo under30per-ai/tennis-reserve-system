@@ -41,7 +41,7 @@ export default function TrialApplicationPage() {
             <TennisBallIcon size={28} />
           </div>
           <h1 className="text-xl font-bold text-net-dark">体験レッスン申込</h1>
-          <p className="text-sm text-gray-500 mt-1">テニススクールの体験レッスンにお申込みいただけます</p>
+          <p className="text-sm text-gray-500 mt-1">Love-All の体験レッスンにお申込みいただけます</p>
         </div>
         <Card>
           <form onSubmit={handleSubmit} noValidate className="space-y-4">
