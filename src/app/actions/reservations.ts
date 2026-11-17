@@ -39,54 +39,56 @@ export async function makeReservation(
     throw new Error('権限がありません');
   }
 
-  // トランザクション内で確認数チェック+INSERTを実行（レースコンディション対策）
-  const reservation = await db.transaction(async (tx) => {
-    const instRows = await tx
-      .select()
-      .from(lessonInstances)
-      .where(eq(lessonInstances.id, lessonInstanceId));
-    if (instRows.length === 0) throw new Error('レッスンが見つかりません');
-    const instance = toLessonInstance(instRows[0]);
+  // neon-http はトランザクション非対応のため sequential queries で実行
+  const instRows = await db
+    .select()
+    .from(lessonInstances)
+    .where(eq(lessonInstances.id, lessonInstanceId));
+  if (instRows.length === 0) throw new Error('レッスンが見つかりません');
+  const instance = toLessonInstance(instRows[0]);
 
-    if (instance.isCancelled) throw new Error('このレッスンは中止されています');
+  if (instance.isCancelled) throw new Error('このレッスンは中止されています');
 
-    const today = new Date().toISOString().slice(0, 10);
-    if (instance.date < today) throw new Error('過去のレッスンは予約できません');
+  const today = new Date().toISOString().slice(0, 10);
+  if (instance.date < today) throw new Error('過去のレッスンは予約できません');
 
-    const existingRows = await tx
-      .select()
-      .from(reservations)
-      .where(
-        and(
-          eq(reservations.lessonInstanceId, lessonInstanceId),
-          inArray(reservations.status, ['confirmed', 'waitlisted'])
-        )
-      );
-    const existing = existingRows.map(toReservation);
+  const existingRows = await db
+    .select()
+    .from(reservations)
+    .where(
+      and(
+        eq(reservations.lessonInstanceId, lessonInstanceId),
+        inArray(reservations.status, ['confirmed', 'waitlisted'])
+      )
+    );
+  const existing = existingRows.map(toReservation);
 
-    const alreadyReserved = existing.find((r) => r.memberId === memberId);
-    if (alreadyReserved) throw new Error('既に予約済みです');
+  const alreadyReserved = existing.find((r) => r.memberId === memberId);
+  if (alreadyReserved) throw new Error('既に予約済みです');
 
-    const confirmedCount = existing.filter((r) => r.status === 'confirmed').length;
-    const isWaitlisted = confirmedCount >= instance.maxCapacity;
-    const waitlistPosition = isWaitlisted
-      ? existing.filter((r) => r.status === 'waitlisted').length + 1
-      : null;
+  const confirmedCount = existing.filter((r) => r.status === 'confirmed').length;
+  const isWaitlisted = confirmedCount >= instance.maxCapacity;
+  const waitlistPosition = isWaitlisted
+    ? existing.filter((r) => r.status === 'waitlisted').length + 1
+    : null;
 
-    const rows = await tx
-      .insert(reservations)
-      .values({
-        memberId,
-        lessonInstanceId,
-        status: isWaitlisted ? 'waitlisted' : 'confirmed',
-        reservedAt: new Date(),
-        waitlistPosition,
-        notes: '',
-      })
-      .returning();
+  const rows = await db
+    .insert(reservations)
+    .values({
+      memberId,
+      lessonInstanceId,
+      status: isWaitlisted ? 'waitlisted' : 'confirmed',
+      reservedAt: new Date(),
+      waitlistPosition,
+      notes: '',
+    })
+    .returning();
 
-    return { reservation: toReservation(rows[0]), isWaitlisted, instanceDate: instance.date };
-  });
+  const reservation = {
+    reservation: toReservation(rows[0]),
+    isWaitlisted,
+    instanceDate: instance.date,
+  };
 
   try {
     if (!reservation.isWaitlisted) {
