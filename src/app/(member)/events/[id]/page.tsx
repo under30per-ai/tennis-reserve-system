@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import useMyEvents from '@/hooks/useMyEvents';
 import useAuth from '@/hooks/useAuth';
 import useToast from '@/hooks/useToast';
+import { getErrorMessage } from '@/lib/utils';
 import Card, { CardTitle } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
@@ -40,7 +41,7 @@ export default function EventDetailPage() {
       setEvent(updated);
       toast.success('イベントに申込みました');
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : '申込に失敗しました');
+      toast.error(getErrorMessage(e, '申込に失敗しました'));
     }
     setSubmitting(false);
   };

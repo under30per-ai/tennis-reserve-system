@@ -38,6 +38,15 @@ export function cn(...classes: (string | undefined | null | false)[]): string {
   return classes.filter(Boolean).join(' ');
 }
 
+export function getErrorMessage(error: unknown, fallback: string): string {
+  if (error instanceof Error && error.message) {
+    if (/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF]/.test(error.message)) {
+      return error.message;
+    }
+  }
+  return fallback;
+}
+
 export function getAvailabilityLabel(available: number, max: number): { label: string; color: string } {
   if (available <= 0) return { label: '満員', color: 'text-red-600' };
   if (available <= Math.ceil(max * 0.2)) return { label: `残り${available}名`, color: 'text-orange-600' };

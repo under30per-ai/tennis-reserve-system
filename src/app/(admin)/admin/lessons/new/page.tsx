@@ -59,7 +59,7 @@ export default function NewLessonPage() {
     <div className="max-w-2xl">
       <Card>
         <CardTitle>新規レッスン追加</CardTitle>
-        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+        <form onSubmit={handleSubmit} noValidate className="space-y-4 mt-4">
           <Input label="レッスン名" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} required placeholder="例: 初級クラスA" />
           <div className="grid sm:grid-cols-2 gap-4">
             <Select label="レベル" value={form.level} onChange={e => setForm(f => ({ ...f, level: e.target.value as LessonLevel }))} options={Object.entries(LEVEL_LABELS).map(([v, l]) => ({ value: v, label: l }))} />

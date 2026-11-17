@@ -6,7 +6,7 @@ export default function MemberError({ error, reset }: { error: Error; reset: () 
   return (
     <div className="flex flex-col items-center justify-center min-h-[50vh] p-4">
       <h2 className="text-xl font-bold text-net-dark mb-2">エラーが発生しました</h2>
-      <p className="text-sm text-gray-500 mb-4">{error.message || '予期しないエラーが発生しました'}</p>
+      <p className="text-sm text-gray-500 mb-4">予期しないエラーが発生しました</p>
       <Button onClick={reset}>再試行</Button>
     </div>
   );

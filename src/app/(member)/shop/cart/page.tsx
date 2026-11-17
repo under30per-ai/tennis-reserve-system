@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import useShop from '@/hooks/useShop';
 import useToast from '@/hooks/useToast';
+import { getErrorMessage } from '@/lib/utils';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Select from '@/components/ui/Select';
@@ -34,7 +35,7 @@ export default function CartPage() {
       toast.success(`注文が完了しました (${order.orderNumber})`);
       router.push('/shop/orders');
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : '注文に失敗しました');
+      toast.error(getErrorMessage(e, '注文に失敗しました'));
     } finally {
       setSubmitting(false);
     }

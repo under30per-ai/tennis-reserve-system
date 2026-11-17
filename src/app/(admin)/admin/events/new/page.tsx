@@ -47,7 +47,7 @@ export default function NewEventPage() {
     <div className="max-w-2xl">
       <Card>
         <CardTitle>新規イベント作成</CardTitle>
-        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+        <form onSubmit={handleSubmit} noValidate className="space-y-4 mt-4">
           <Input label="タイトル" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} required />
           <div>
             <label className="block text-sm font-medium text-net-gray mb-1">説明</label>

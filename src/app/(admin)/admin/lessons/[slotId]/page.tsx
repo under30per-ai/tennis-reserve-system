@@ -62,7 +62,7 @@ export default function EditLessonPage() {
     <div className="max-w-2xl">
       <Card>
         <CardTitle>レッスン編集: {slot.title}</CardTitle>
-        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+        <form onSubmit={handleSubmit} noValidate className="space-y-4 mt-4">
           <Input label="レッスン名" value={slot.title} onChange={e => setSlot(s => s ? { ...s, title: e.target.value } : s)} required />
           <div className="grid sm:grid-cols-2 gap-4">
             <Select label="レベル" value={slot.level} onChange={e => setSlot(s => s ? { ...s, level: e.target.value as LessonLevel } : s)} options={Object.entries(LEVEL_LABELS).map(([v, l]) => ({ value: v, label: l }))} />

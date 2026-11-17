@@ -35,7 +35,7 @@ export default function NewTicketTypePage() {
     <div className="max-w-2xl">
       <Card>
         <CardTitle>新規チケット種別</CardTitle>
-        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+        <form onSubmit={handleSubmit} noValidate className="space-y-4 mt-4">
           <Input label="名前" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
           <Input label="説明" value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} />
           <div className="grid sm:grid-cols-3 gap-4">

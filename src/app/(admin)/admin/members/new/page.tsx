@@ -47,7 +47,7 @@ export default function NewMemberPage() {
     <div className="max-w-2xl">
       <Card>
         <CardTitle>新規会員追加</CardTitle>
-        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+        <form onSubmit={handleSubmit} noValidate className="space-y-4 mt-4">
           <div className="grid sm:grid-cols-2 gap-4">
             <Input label="氏名" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />
             <Input label="フリガナ" value={form.nameKana} onChange={e => setForm(f => ({ ...f, nameKana: e.target.value }))} required />

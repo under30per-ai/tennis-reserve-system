@@ -47,7 +47,7 @@ export default function ChatInput({ onSend }: ChatInputProps) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="flex items-end gap-2 p-3 border-t bg-white">
+    <form onSubmit={handleSubmit} noValidate className="flex items-end gap-2 p-3 border-t bg-white">
       <textarea
         ref={textareaRef}
         value={message}

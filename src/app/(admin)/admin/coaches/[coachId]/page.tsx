@@ -45,7 +45,7 @@ export default function EditCoachPage() {
     <div className="max-w-2xl">
       <Card>
         <CardTitle>コーチ編集: {coach.name}</CardTitle>
-        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+        <form onSubmit={handleSubmit} noValidate className="space-y-4 mt-4">
           <div className="grid sm:grid-cols-2 gap-4">
             <Input label="氏名" value={coach.name} onChange={e => setCoach(c => c ? { ...c, name: e.target.value } : c)} required />
             <Input label="フリガナ" value={coach.nameKana} onChange={e => setCoach(c => c ? { ...c, nameKana: e.target.value } : c)} required />

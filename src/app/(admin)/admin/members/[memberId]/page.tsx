@@ -130,7 +130,7 @@ export default function MemberDetailPage() {
         <div className="max-w-2xl">
           <Card>
             <CardTitle>会員編集</CardTitle>
-            <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+            <form onSubmit={handleSubmit} noValidate className="space-y-4 mt-4">
               <div className="grid sm:grid-cols-2 gap-4">
                 <Input label="氏名" value={member.name} onChange={e => setMember(m => m ? { ...m, name: e.target.value } : m)} required />
                 <Input label="フリガナ" value={member.nameKana} onChange={e => setMember(m => m ? { ...m, nameKana: e.target.value } : m)} required />

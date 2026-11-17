@@ -16,7 +16,7 @@ import Modal from '@/components/ui/Modal';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { getWeekDays, formatWeekRange } from '@/lib/calendar-utils';
 import { DAY_LABELS, LEVEL_LABELS, CANCEL_REASONS, CANCEL_REASON_LABELS } from '@/lib/constants';
-import { toISODateString } from '@/lib/utils';
+import { toISODateString, getErrorMessage } from '@/lib/utils';
 import { LessonInstanceWithDetails, LessonLevel } from '@/types';
 
 export default function SchedulePage() {
@@ -94,7 +94,7 @@ export default function SchedulePage() {
       setCancelReason('');
       setCancelReasonOther('');
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : '中止に失敗しました');
+      toast.error(getErrorMessage(e, '中止に失敗しました'));
     }
   };
 

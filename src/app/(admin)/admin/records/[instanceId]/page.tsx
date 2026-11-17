@@ -8,6 +8,7 @@ import useLessonInstances from '@/hooks/useLessonInstances';
 import useLessonRecords from '@/hooks/useLessonRecords';
 import useMembers from '@/hooks/useMembers';
 import useToast from '@/hooks/useToast';
+import { getErrorMessage } from '@/lib/utils';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
@@ -139,7 +140,7 @@ export default function RecordEditPage() {
       }
       router.push('/admin/records');
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : '保存に失敗しました');
+      toast.error(getErrorMessage(e, '保存に失敗しました'));
     } finally {
       setIsSubmitting(false);
     }

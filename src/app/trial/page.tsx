@@ -44,7 +44,7 @@ export default function TrialApplicationPage() {
           <p className="text-sm text-gray-500 mt-1">テニススクールの体験レッスンにお申込みいただけます</p>
         </div>
         <Card>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} noValidate className="space-y-4">
             {error && <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">{error}</p>}
             <div className="grid sm:grid-cols-2 gap-4">
               <Input label="お名前" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} required />

@@ -128,7 +128,7 @@ export default function RegisterPage() {
 
         <div className="bg-white rounded-2xl shadow-xl border border-court-grass/10 overflow-hidden">
           {step === 'form' ? (
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
+            <form onSubmit={handleSubmit} noValidate className="p-6 space-y-4">
               <Input
                 label="氏名"
                 type="text"
@@ -197,7 +197,7 @@ export default function RegisterPage() {
               </div>
             </form>
           ) : (
-            <form onSubmit={handleVerify} className="p-6 space-y-4">
+            <form onSubmit={handleVerify} noValidate className="p-6 space-y-4">
               <div className="text-center text-sm text-gray-600 mb-2">
                 <p><strong>{email}</strong> に確認コードを送信しました。</p>
                 <p>メールに記載された6桁のコードを入力してください。</p>

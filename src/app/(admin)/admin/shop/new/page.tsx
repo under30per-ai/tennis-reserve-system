@@ -57,7 +57,7 @@ export default function NewProductPage() {
     <div className="max-w-2xl">
       <Card>
         <CardTitle>新規商品追加</CardTitle>
-        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+        <form onSubmit={handleSubmit} noValidate className="space-y-4 mt-4">
           <Input label="商品名" value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} required />
           <Textarea label="説明" value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
           <Select

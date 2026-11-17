@@ -11,7 +11,7 @@ import Badge from '@/components/ui/Badge';
 import NetDivider from '@/components/tennis/NetDivider';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { MEMBERSHIP_LABELS } from '@/lib/constants';
-import { formatDate, getInitials } from '@/lib/utils';
+import { formatDate, getInitials, getErrorMessage } from '@/lib/utils';
 import { Member } from '@/types';
 import { updateOwnProfile } from '@/app/actions/members';
 
@@ -35,7 +35,7 @@ export default function ProfilePage() {
       setEditMember(null);
       await refreshMember();
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : 'プロフィールの更新に失敗しました');
+      toast.error(getErrorMessage(err, 'プロフィールの更新に失敗しました'));
     }
   };
 

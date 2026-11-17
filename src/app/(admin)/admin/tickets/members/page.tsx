@@ -8,7 +8,7 @@ import Card, { CardTitle } from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
 import EmptyState from '@/components/ui/EmptyState';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
-import { formatDate } from '@/lib/utils';
+import { formatDate, getErrorMessage } from '@/lib/utils';
 
 export default function MemberTicketsPage() {
   const { ticketTypes, memberTickets, loading, issueMemberTicket } = useTickets({ eagerLoad: true });
@@ -28,7 +28,7 @@ export default function MemberTicketsPage() {
       setSelectedMember('');
       setSelectedType('');
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : '発行に失敗しました');
+      toast.error(getErrorMessage(e, '発行に失敗しました'));
     }
   };
 

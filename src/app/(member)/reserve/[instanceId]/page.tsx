@@ -13,7 +13,7 @@ import { LevelBadge } from '@/components/ui/Badge';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import NetDivider from '@/components/tennis/NetDivider';
 import TennisBallIcon from '@/components/tennis/TennisBallIcon';
-import { formatDate, getAvailabilityLabel } from '@/lib/utils';
+import { formatDate, getAvailabilityLabel, getErrorMessage } from '@/lib/utils';
 import { DAY_LABELS } from '@/lib/constants';
 import { LessonInstanceWithDetails } from '@/types';
 
@@ -65,7 +65,7 @@ export default function ReserveConfirmPage() {
         router.push('/reserve/complete');
       }
     } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : (isTransferMode ? '振替に失敗しました' : '予約に失敗しました'));
+      toast.error(getErrorMessage(err, isTransferMode ? '振替に失敗しました' : '予約に失敗しました'));
     }
   };
 

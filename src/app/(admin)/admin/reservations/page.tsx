@@ -14,7 +14,7 @@ import EmptyState from '@/components/ui/EmptyState';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import { RESERVATION_STATUS_LABELS } from '@/lib/constants';
-import { formatDate } from '@/lib/utils';
+import { formatDate, getErrorMessage } from '@/lib/utils';
 import { ReservationStatus } from '@/types';
 
 export default function ReservationsPage() {
@@ -50,7 +50,7 @@ export default function ReservationsPage() {
         toast.success('予約をキャンセルしました');
         setCancelTarget(null);
       } catch (e) {
-        toast.error(e instanceof Error ? e.message : 'キャンセルに失敗しました');
+        toast.error(getErrorMessage(e, 'キャンセルに失敗しました'));
       }
     }
   };
