@@ -25,12 +25,23 @@ export default function ReserveConfirmPage() {
   const isTransferMode = !!fromInstanceId;
   const router = useRouter();
   const { user } = useAuth();
-  const { member, loading: memberLoading, refreshReservations } = useMemberData();
+  const { member, reservations, loading: memberLoading, refreshReservations } = useMemberData();
   const { getInstanceWithDetails, loading: instancesLoading } = useLessonInstances();
   const { makeReservation, transferReservation } = useReservations();
   const toast = useToast();
 
   const [instance, setInstance] = useState<LessonInstanceWithDetails | null>(null);
+
+  const alreadyReserved = reservations.some(
+    r => r.lessonInstanceId === instanceId && (r.status === 'confirmed' || r.status === 'waitlisted')
+  );
+
+  useEffect(() => {
+    if (alreadyReserved && !isTransferMode) {
+      toast.error('このレッスンは既に予約済みです');
+      router.back();
+    }
+  }, [alreadyReserved, isTransferMode, toast, router]);
 
   useEffect(() => {
     getInstanceWithDetails(instanceId).then(inst => setInstance(inst));
@@ -38,7 +49,7 @@ export default function ReserveConfirmPage() {
 
   const transferDisabled = isTransferMode && !member;
 
-  if (instancesLoading || memberLoading || !instance) return <LoadingSpinner />;
+  if (instancesLoading || memberLoading || !instance || (alreadyReserved && !isTransferMode)) return <LoadingSpinner />;
 
   const avail = getAvailabilityLabel(instance.availableSpots, instance.maxCapacity);
   const isFull = instance.availableSpots <= 0;
