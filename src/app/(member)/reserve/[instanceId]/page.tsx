@@ -128,12 +128,6 @@ export default function ReserveConfirmPage() {
           </div>
         )}
 
-        {!isPast && alreadyReserved && !isTransferMode && (
-          <div className="bg-court-light border border-court-grass/30 rounded-lg p-3 mb-4">
-            <p className="text-sm text-court-green font-medium">このレッスンは予約済みです</p>
-          </div>
-        )}
-
         <div className="flex gap-3">
           {isPast || (alreadyReserved && !isTransferMode) ? (
             <Button variant="ghost" className="flex-1" onClick={() => router.back()}>戻る</Button>
