@@ -37,19 +37,12 @@ export default function ReserveConfirmPage() {
   );
 
   useEffect(() => {
-    if (alreadyReserved && !isTransferMode) {
-      toast.error('このレッスンは既に予約済みです');
-      router.back();
-    }
-  }, [alreadyReserved, isTransferMode, toast, router]);
-
-  useEffect(() => {
     getInstanceWithDetails(instanceId).then(inst => setInstance(inst));
   }, [instanceId, getInstanceWithDetails]);
 
   const transferDisabled = isTransferMode && !member;
 
-  if (instancesLoading || memberLoading || !instance || (alreadyReserved && !isTransferMode)) return <LoadingSpinner />;
+  if (instancesLoading || memberLoading || !instance) return <LoadingSpinner />;
 
   const avail = getAvailabilityLabel(instance.availableSpots, instance.maxCapacity);
   const isFull = instance.availableSpots <= 0;
@@ -135,8 +128,14 @@ export default function ReserveConfirmPage() {
           </div>
         )}
 
+        {!isPast && alreadyReserved && !isTransferMode && (
+          <div className="bg-court-light border border-court-grass/30 rounded-lg p-3 mb-4">
+            <p className="text-sm text-court-green font-medium">このレッスンは予約済みです</p>
+          </div>
+        )}
+
         <div className="flex gap-3">
-          {isPast ? (
+          {isPast || (alreadyReserved && !isTransferMode) ? (
             <Button variant="ghost" className="flex-1" onClick={() => router.back()}>戻る</Button>
           ) : (
             <>
