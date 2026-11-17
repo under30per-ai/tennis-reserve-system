@@ -74,7 +74,12 @@ export default function ReservePage() {
       <div className="space-y-4">
         {weekDays.map(day => {
           const dateStr = toISODateString(day);
-          const instances = (instancesByDate[dateStr] ?? []).filter(inst => !reservedInstanceIds.has(inst.id));
+          const now = new Date();
+          const nowTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+          const instances = (instancesByDate[dateStr] ?? []).filter(inst =>
+            !reservedInstanceIds.has(inst.id) &&
+            !(isToday(day) && inst.startTime <= nowTime)
+          );
           const today = isToday(day);
           return (
             <div key={dateStr}>

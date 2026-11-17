@@ -47,8 +47,10 @@ export default function ReserveConfirmPage() {
   const avail = getAvailabilityLabel(instance.availableSpots, instance.maxCapacity);
   const isFull = instance.availableSpots <= 0;
   const dayOfWeek = new Date(instance.date).getDay();
-  const today = new Date().toISOString().slice(0, 10);
-  const isPast = instance.date < today;
+  const now = new Date();
+  const today = now.toISOString().slice(0, 10);
+  const nowTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+  const isPast = instance.date < today || (instance.date === today && instance.startTime <= nowTime);
 
   const handleReserve = async () => {
     if (!user?.memberId) return;
