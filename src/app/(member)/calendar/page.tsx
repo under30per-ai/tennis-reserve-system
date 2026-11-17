@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { format, addWeeks, subWeeks, addMonths, subMonths, isSameMonth, isToday } from 'date-fns';
+import { useMemberData } from '@/contexts/MemberDataContext';
 import useLessonInstances from '@/hooks/useLessonInstances';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
@@ -17,8 +18,15 @@ import { LessonInstanceWithDetails } from '@/types';
 export default function CalendarPage() {
   const [view, setView] = useState<'weekly' | 'monthly'>('weekly');
   const [currentDate, setCurrentDate] = useState(new Date());
+  const { reservations } = useMemberData();
   const { getInstancesWithDetailsForDateRange } = useLessonInstances();
   const router = useRouter();
+
+  const reservedInstanceIds = useMemo(() => new Set(
+    reservations
+      .filter(r => r.status === 'confirmed' || r.status === 'waitlisted')
+      .map(r => r.lessonInstanceId)
+  ), [reservations]);
 
   const weekDays = useMemo(() => getWeekDays(currentDate), [currentDate]);
   const monthDays = useMemo(() => getCalendarMonthDays(currentDate), [currentDate]);
@@ -63,7 +71,7 @@ export default function CalendarPage() {
           <div className="space-y-4">
             {weekDays.map(day => {
               const dateStr = toISODateString(day);
-              const instances = instancesByDate[dateStr] ?? [];
+              const instances = (instancesByDate[dateStr] ?? []).filter(inst => !reservedInstanceIds.has(inst.id));
               const today = isToday(day);
               return (
                 <div key={dateStr}>
@@ -127,7 +135,7 @@ export default function CalendarPage() {
             ))}
             {monthDays.map((day, i) => {
               const dateStr = toISODateString(day);
-              const instances = instancesByDate[dateStr] ?? [];
+              const instances = (instancesByDate[dateStr] ?? []).filter(inst => !reservedInstanceIds.has(inst.id));
               const inMonth = isSameMonth(day, currentDate);
               const today = isToday(day);
               return (

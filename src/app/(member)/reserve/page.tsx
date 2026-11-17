@@ -3,6 +3,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { format, addWeeks, subWeeks, isToday, parseISO } from 'date-fns';
+import { useMemberData } from '@/contexts/MemberDataContext';
 import useLessonInstances from '@/hooks/useLessonInstances';
 import Card from '@/components/ui/Card';
 import Button from '@/components/ui/Button';
@@ -25,7 +26,14 @@ export default function ReservePage() {
     return new Date();
   });
 
+  const { reservations } = useMemberData();
   const { getInstancesWithDetailsForDateRange } = useLessonInstances();
+
+  const reservedInstanceIds = useMemo(() => new Set(
+    reservations
+      .filter(r => r.status === 'confirmed' || r.status === 'waitlisted')
+      .map(r => r.lessonInstanceId)
+  ), [reservations]);
 
   const weekDays = useMemo(() => getWeekDays(currentDate), [currentDate]);
 
@@ -66,7 +74,7 @@ export default function ReservePage() {
       <div className="space-y-4">
         {weekDays.map(day => {
           const dateStr = toISODateString(day);
-          const instances = instancesByDate[dateStr] ?? [];
+          const instances = (instancesByDate[dateStr] ?? []).filter(inst => !reservedInstanceIds.has(inst.id));
           const today = isToday(day);
           return (
             <div key={dateStr}>
