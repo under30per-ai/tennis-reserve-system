@@ -234,7 +234,7 @@ describe('createProduct', () => {
   it('throws when not admin', async () => {
     setAuthenticatedUser(mockCookieStore, MEMBER_USER);
     await expect(createProduct({
-      name: 'Test', description: '', category: 'racket', price: 1000, stock: 5, isActive: true,
+      name: 'Test', description: '', category: 'racket', price: 1000, stock: 5,
     })).rejects.toThrow('管理者権限が必要です');
   });
 
@@ -242,7 +242,7 @@ describe('createProduct', () => {
     setAuthenticatedUser(mockCookieStore, ADMIN_USER);
     mockDb.insert.mockReturnValue(createChainMock([productRow({ id: 'p-new' })]));
     const result = await createProduct({
-      name: 'New', description: 'Desc', category: 'racket', price: 5000, stock: 10, isActive: true,
+      name: 'New', description: 'Desc', category: 'racket', price: 5000, stock: 10,
     });
     expect(result.id).toBe('p-new');
   });
