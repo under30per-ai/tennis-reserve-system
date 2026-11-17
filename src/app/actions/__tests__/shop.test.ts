@@ -39,9 +39,22 @@ vi.mock('@/lib/audit-log', () => ({
 
 // ── Import after mocks ────────────────────────────────
 
-const { createShopOrder, cancelMyShopOrder } = await import(
-  '@/app/actions/shop'
-);
+const {
+  createShopOrder,
+  cancelMyShopOrder,
+  getProducts,
+  getProductById,
+  createProduct,
+  updateProduct,
+  deleteProduct,
+  getShopOrders,
+  getShopOrderById,
+  updateShopOrderStatus,
+  getActiveProducts,
+  getProductDetail,
+  getMyShopOrders,
+  getMyShopOrderDetail,
+} = await import('@/app/actions/shop');
 
 beforeEach(() => {
   mockCookieStore._store.clear();
@@ -174,5 +187,267 @@ describe('cancelMyShopOrder', () => {
     expect(result.status).toBe('cancelled');
     // update called: 1 for stock restore, 1 for order status
     expect(mockDb.update).toHaveBeenCalledTimes(2);
+  });
+});
+
+// ── getProducts (admin) ───────────────────────────────
+
+describe('getProducts', () => {
+  it('throws when not admin', async () => {
+    setAuthenticatedUser(mockCookieStore, MEMBER_USER);
+    await expect(getProducts()).rejects.toThrow('管理者権限が必要です');
+  });
+
+  it('returns products for admin', async () => {
+    setAuthenticatedUser(mockCookieStore, ADMIN_USER);
+    mockDb.select.mockReturnValue(createChainMock([productRow()]));
+    const result = await getProducts();
+    expect(result).toHaveLength(1);
+  });
+});
+
+// ── getProductById ────────────────────────────────────
+
+describe('getProductById', () => {
+  it('throws when not admin', async () => {
+    setAuthenticatedUser(mockCookieStore, MEMBER_USER);
+    await expect(getProductById('p1')).rejects.toThrow('管理者権限が必要です');
+  });
+
+  it('returns product when found', async () => {
+    setAuthenticatedUser(mockCookieStore, ADMIN_USER);
+    mockDb.select.mockReturnValue(createChainMock([productRow()]));
+    const result = await getProductById('p1');
+    expect(result).not.toBeNull();
+  });
+
+  it('returns null when not found', async () => {
+    setAuthenticatedUser(mockCookieStore, ADMIN_USER);
+    mockDb.select.mockReturnValue(createChainMock([]));
+    expect(await getProductById('p-none')).toBeNull();
+  });
+});
+
+// ── createProduct ─────────────────────────────────────
+
+describe('createProduct', () => {
+  it('throws when not admin', async () => {
+    setAuthenticatedUser(mockCookieStore, MEMBER_USER);
+    await expect(createProduct({
+      name: 'Test', description: '', category: 'racket', price: 1000, stock: 5, isActive: true,
+    })).rejects.toThrow('管理者権限が必要です');
+  });
+
+  it('creates product for admin', async () => {
+    setAuthenticatedUser(mockCookieStore, ADMIN_USER);
+    mockDb.insert.mockReturnValue(createChainMock([productRow({ id: 'p-new' })]));
+    const result = await createProduct({
+      name: 'New', description: 'Desc', category: 'racket', price: 5000, stock: 10, isActive: true,
+    });
+    expect(result.id).toBe('p-new');
+  });
+});
+
+// ── updateProduct ─────────────────────────────────────
+
+describe('updateProduct', () => {
+  it('throws when not admin', async () => {
+    setAuthenticatedUser(mockCookieStore, MEMBER_USER);
+    await expect(updateProduct('p1', { name: 'Updated' })).rejects.toThrow('管理者権限が必要です');
+  });
+
+  it('updates product for admin', async () => {
+    setAuthenticatedUser(mockCookieStore, ADMIN_USER);
+    mockDb.update.mockReturnValue(createChainMock([productRow({ name: 'Updated' })]));
+    const result = await updateProduct('p1', { name: 'Updated' });
+    expect(result).not.toBeNull();
+  });
+
+  it('returns null when not found', async () => {
+    setAuthenticatedUser(mockCookieStore, ADMIN_USER);
+    mockDb.update.mockReturnValue(createChainMock([]));
+    expect(await updateProduct('p-none', { name: 'X' })).toBeNull();
+  });
+});
+
+// ── deleteProduct ─────────────────────────────────────
+
+describe('deleteProduct', () => {
+  it('throws when not admin', async () => {
+    setAuthenticatedUser(mockCookieStore, MEMBER_USER);
+    await expect(deleteProduct('p1')).rejects.toThrow('管理者権限が必要です');
+  });
+
+  it('soft-deletes product for admin', async () => {
+    setAuthenticatedUser(mockCookieStore, ADMIN_USER);
+    mockDb.update.mockReturnValue(createChainMock([]));
+    await deleteProduct('p1');
+    expect(mockDb.update).toHaveBeenCalled();
+  });
+});
+
+// ── getShopOrders ─────────────────────────────────────
+
+describe('getShopOrders', () => {
+  it('throws when not admin', async () => {
+    setAuthenticatedUser(mockCookieStore, MEMBER_USER);
+    await expect(getShopOrders()).rejects.toThrow('管理者権限が必要です');
+  });
+
+  it('returns orders for admin', async () => {
+    setAuthenticatedUser(mockCookieStore, ADMIN_USER);
+    mockDb.select.mockReturnValue(createChainMock([]));
+    const result = await getShopOrders();
+    expect(result).toEqual([]);
+  });
+});
+
+// ── getShopOrderById ──────────────────────────────────
+
+describe('getShopOrderById', () => {
+  it('throws when not admin', async () => {
+    setAuthenticatedUser(mockCookieStore, MEMBER_USER);
+    await expect(getShopOrderById('so1')).rejects.toThrow('管理者権限が必要です');
+  });
+
+  it('returns order with items', async () => {
+    setAuthenticatedUser(mockCookieStore, ADMIN_USER);
+    let c = 0;
+    mockDb.select.mockImplementation(() => {
+      c++;
+      if (c === 1) return createChainMock([shopOrderRow()]);
+      return createChainMock([shopOrderItemRow()]);
+    });
+    const result = await getShopOrderById('so1');
+    expect(result).not.toBeNull();
+  });
+
+  it('returns null when not found', async () => {
+    setAuthenticatedUser(mockCookieStore, ADMIN_USER);
+    mockDb.select.mockReturnValue(createChainMock([]));
+    expect(await getShopOrderById('so-none')).toBeNull();
+  });
+});
+
+// ── updateShopOrderStatus ─────────────────────────────
+
+describe('updateShopOrderStatus', () => {
+  it('throws when not admin', async () => {
+    setAuthenticatedUser(mockCookieStore, MEMBER_USER);
+    await expect(updateShopOrderStatus('so1', { status: 'confirmed' })).rejects.toThrow('管理者権限が必要です');
+  });
+
+  it('updates order status for admin', async () => {
+    setAuthenticatedUser(mockCookieStore, ADMIN_USER);
+    mockDb.select.mockReturnValue(createChainMock([shopOrderRow()])); // existing order lookup
+    mockDb.update.mockReturnValue(createChainMock([shopOrderRow({ status: 'confirmed' })]));
+    const result = await updateShopOrderStatus('so1', { status: 'confirmed' });
+    expect(result).not.toBeNull();
+  });
+
+  it('restores stock when cancelling', async () => {
+    setAuthenticatedUser(mockCookieStore, ADMIN_USER);
+    mockDb.select.mockReturnValue(createChainMock([shopOrderItemRow()]));
+    mockDb.update.mockReturnValue(createChainMock([shopOrderRow({ status: 'cancelled' })]));
+    await updateShopOrderStatus('so1', { status: 'cancelled' });
+    // update called: stock restore + order status
+    expect(mockDb.update).toHaveBeenCalled();
+  });
+
+  it('returns null when not found', async () => {
+    setAuthenticatedUser(mockCookieStore, ADMIN_USER);
+    mockDb.update.mockReturnValue(createChainMock([]));
+    expect(await updateShopOrderStatus('so-none', { status: 'confirmed' })).toBeNull();
+  });
+});
+
+// ── getActiveProducts ─────────────────────────────────
+
+describe('getActiveProducts', () => {
+  it('throws when not authenticated', async () => {
+    await expect(getActiveProducts()).rejects.toThrow('認証が必要です');
+  });
+
+  it('returns active products', async () => {
+    setAuthenticatedUser(mockCookieStore, MEMBER_USER);
+    mockDb.select.mockReturnValue(createChainMock([productRow()]));
+    const result = await getActiveProducts();
+    expect(result).toHaveLength(1);
+  });
+
+  it('filters by category', async () => {
+    setAuthenticatedUser(mockCookieStore, MEMBER_USER);
+    mockDb.select.mockReturnValue(createChainMock([productRow({ category: 'racket' })]));
+    const result = await getActiveProducts('racket');
+    expect(result).toHaveLength(1);
+  });
+});
+
+// ── getProductDetail ──────────────────────────────────
+
+describe('getProductDetail', () => {
+  it('throws when not authenticated', async () => {
+    await expect(getProductDetail('p1')).rejects.toThrow('認証が必要です');
+  });
+
+  it('returns product detail', async () => {
+    setAuthenticatedUser(mockCookieStore, MEMBER_USER);
+    mockDb.select.mockReturnValue(createChainMock([productRow()]));
+    const result = await getProductDetail('p1');
+    expect(result).not.toBeNull();
+  });
+
+  it('returns null when not found', async () => {
+    setAuthenticatedUser(mockCookieStore, MEMBER_USER);
+    mockDb.select.mockReturnValue(createChainMock([]));
+    expect(await getProductDetail('p-none')).toBeNull();
+  });
+});
+
+// ── getMyShopOrders ───────────────────────────────────
+
+describe('getMyShopOrders', () => {
+  it('throws when not authenticated', async () => {
+    await expect(getMyShopOrders()).rejects.toThrow('認証が必要です');
+  });
+
+  it('returns own orders for member', async () => {
+    setAuthenticatedUser(mockCookieStore, MEMBER_USER);
+    mockDb.select.mockReturnValue(createChainMock([shopOrderRow()]));
+    const result = await getMyShopOrders();
+    expect(result).toHaveLength(1);
+  });
+});
+
+// ── getMyShopOrderDetail ──────────────────────────────
+
+describe('getMyShopOrderDetail', () => {
+  it('throws when not authenticated', async () => {
+    await expect(getMyShopOrderDetail('so1')).rejects.toThrow('認証が必要です');
+  });
+
+  it('returns own order detail', async () => {
+    setAuthenticatedUser(mockCookieStore, MEMBER_USER);
+    let c = 0;
+    mockDb.select.mockImplementation(() => {
+      c++;
+      if (c === 1) return createChainMock([shopOrderRow({ memberId: 'm1' })]);
+      return createChainMock([shopOrderItemRow()]);
+    });
+    const result = await getMyShopOrderDetail('so1');
+    expect(result).not.toBeNull();
+  });
+
+  it('returns null when not found', async () => {
+    setAuthenticatedUser(mockCookieStore, MEMBER_USER);
+    mockDb.select.mockReturnValue(createChainMock([]));
+    expect(await getMyShopOrderDetail('so-none')).toBeNull();
+  });
+
+  it('returns null when order belongs to other member', async () => {
+    setAuthenticatedUser(mockCookieStore, MEMBER_USER);
+    // DB WHERE clause includes memberId check, so no rows returned for other member
+    mockDb.select.mockReturnValue(createChainMock([]));
+    expect(await getMyShopOrderDetail('so1')).toBeNull();
   });
 });

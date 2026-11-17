@@ -34,7 +34,14 @@ vi.mock('@/lib/rate-limit', () => ({
 
 // ── Import after mocks ────────────────────────────────
 
-const { sendMessage } = await import('@/app/actions/chat');
+const {
+  sendMessage,
+  getConversation,
+  getConversationList,
+  markMessagesAsRead,
+  getPartnerName,
+  getUnreadMessageCount,
+} = await import('@/app/actions/chat');
 
 beforeEach(() => {
   mockCookieStore._store.clear();
@@ -110,5 +117,111 @@ describe('sendMessage', () => {
     const result = await sendMessage('m1', '返信です');
     expect(result.senderRole).toBe('admin');
     expect(result.receiverId).toBe('m1');
+  });
+});
+
+// ── getConversation ───────────────────────────────────
+
+describe('getConversation', () => {
+  it('throws when not authenticated', async () => {
+    await expect(getConversation('admin')).rejects.toThrow('認証が必要です');
+  });
+
+  it('throws when member tries to view non-admin conversation', async () => {
+    setAuthenticatedUser(mockCookieStore, MEMBER_USER);
+    await expect(getConversation('other-member')).rejects.toThrow('権限がありません');
+  });
+
+  it('returns messages for member-admin conversation', async () => {
+    setAuthenticatedUser(mockCookieStore, MEMBER_USER);
+    const msg = chatMessageRow();
+    mockDb.select.mockReturnValue(createChainMock([msg]));
+    const result = await getConversation('admin');
+    expect(result).toHaveLength(1);
+  });
+
+  it('admin can view any member conversation', async () => {
+    setAuthenticatedUser(mockCookieStore, ADMIN_USER);
+    mockDb.select.mockReturnValue(createChainMock([chatMessageRow()]));
+    const result = await getConversation('m1');
+    expect(result).toHaveLength(1);
+  });
+});
+
+// ── getConversationList ───────────────────────────────
+
+describe('getConversationList', () => {
+  it('throws when not authenticated', async () => {
+    await expect(getConversationList()).rejects.toThrow('認証が必要です');
+  });
+
+  it('returns conversations for member', async () => {
+    setAuthenticatedUser(mockCookieStore, MEMBER_USER);
+    mockDb.select.mockReturnValue(createChainMock([]));
+    const result = await getConversationList();
+    expect(result).toEqual([]);
+  });
+
+  it('returns conversations for admin', async () => {
+    setAuthenticatedUser(mockCookieStore, ADMIN_USER);
+    mockDb.select.mockReturnValue(createChainMock([]));
+    const result = await getConversationList();
+    expect(result).toEqual([]);
+  });
+});
+
+// ── markMessagesAsRead ────────────────────────────────
+
+describe('markMessagesAsRead', () => {
+  it('throws when not authenticated', async () => {
+    await expect(markMessagesAsRead('admin')).rejects.toThrow('認証が必要です');
+  });
+
+  it('marks messages as read', async () => {
+    setAuthenticatedUser(mockCookieStore, MEMBER_USER);
+    mockDb.update.mockReturnValue(createChainMock([]));
+    await markMessagesAsRead('admin');
+    expect(mockDb.update).toHaveBeenCalled();
+  });
+});
+
+// ── getPartnerName ────────────────────────────────────
+
+describe('getPartnerName', () => {
+  it('throws when not authenticated', async () => {
+    await expect(getPartnerName('admin')).rejects.toThrow('認証が必要です');
+  });
+
+  it('returns admin name for member', async () => {
+    setAuthenticatedUser(mockCookieStore, MEMBER_USER);
+    const result = await getPartnerName('admin');
+    expect(result).toBe('管理者');
+  });
+
+  it('throws when member requests non-admin partner', async () => {
+    setAuthenticatedUser(mockCookieStore, MEMBER_USER);
+    await expect(getPartnerName('other-member')).rejects.toThrow();
+  });
+
+  it('admin gets member name', async () => {
+    setAuthenticatedUser(mockCookieStore, ADMIN_USER);
+    mockDb.select.mockReturnValue(createChainMock([memberRow()]));
+    const result = await getPartnerName('m1');
+    expect(result).toBe('田中太郎');
+  });
+});
+
+// ── getUnreadMessageCount ─────────────────────────────
+
+describe('getUnreadMessageCount', () => {
+  it('throws when not authenticated', async () => {
+    await expect(getUnreadMessageCount()).rejects.toThrow('認証が必要です');
+  });
+
+  it('returns count for authenticated user', async () => {
+    setAuthenticatedUser(mockCookieStore, MEMBER_USER);
+    mockDb.select.mockReturnValue(createChainMock([{ count: 3 }]));
+    const result = await getUnreadMessageCount();
+    expect(typeof result).toBe('number');
   });
 });

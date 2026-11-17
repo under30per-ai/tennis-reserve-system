@@ -5,7 +5,7 @@ import {
   ADMIN_USER,
   MEMBER_USER,
 } from './helpers/mock-auth';
-import { lessonInstanceRow, reservationRow } from './helpers/fixtures';
+import { lessonInstanceRow, reservationRow, memberRow, lessonSlotRow, coachRow, courtRow } from './helpers/fixtures';
 import { createChainMock } from './helpers/mock-db';
 
 // ── Mocks ─────────────────────────────────────────────
@@ -43,9 +43,15 @@ vi.mock('@/lib/audit-log', () => ({
 
 // ── Import after mocks ────────────────────────────────
 
-const { makeReservation, cancelReservation, transferReservation } = await import(
-  '@/app/actions/reservations'
-);
+const {
+  makeReservation,
+  cancelReservation,
+  transferReservation,
+  getReservations,
+  getMemberReservations,
+  getReservationsForInstance,
+  getAllReservationsWithDetails,
+} = await import('@/app/actions/reservations');
 
 beforeEach(() => {
   mockCookieStore._store.clear();
@@ -326,5 +332,103 @@ describe('transferReservation', () => {
     await expect(transferReservation('m1', 'li2', 'li3')).rejects.toThrow(
       '振替先の予約を再度振替することはできません'
     );
+  });
+});
+
+// ── getReservations ───────────────────────────────────
+
+describe('getReservations', () => {
+  it('throws when not admin', async () => {
+    setAuthenticatedUser(mockCookieStore, MEMBER_USER);
+    await expect(getReservations()).rejects.toThrow('管理者権限が必要です');
+  });
+
+  it('returns reservations for admin', async () => {
+    setAuthenticatedUser(mockCookieStore, ADMIN_USER);
+    mockDb.select.mockReturnValue(createChainMock([reservationRow()]));
+    const result = await getReservations();
+    expect(result).toHaveLength(1);
+  });
+
+  it('returns empty array when none exist', async () => {
+    setAuthenticatedUser(mockCookieStore, ADMIN_USER);
+    mockDb.select.mockReturnValue(createChainMock([]));
+    const result = await getReservations();
+    expect(result).toHaveLength(0);
+  });
+});
+
+// ── getMemberReservations ─────────────────────────────
+
+describe('getMemberReservations', () => {
+  it('throws when not authenticated', async () => {
+    await expect(getMemberReservations('m1')).rejects.toThrow('認証が必要です');
+  });
+
+  it('throws when member accesses other member reservations', async () => {
+    setAuthenticatedUser(mockCookieStore, MEMBER_USER);
+    await expect(getMemberReservations('m2')).rejects.toThrow('権限がありません');
+  });
+
+  it('returns own reservations', async () => {
+    setAuthenticatedUser(mockCookieStore, MEMBER_USER);
+    const joinedRow = {
+      reservations: reservationRow(),
+      members: memberRow(),
+      lesson_instances: lessonInstanceRow(),
+      lesson_slots: lessonSlotRow(),
+      coaches: coachRow(),
+      courts: courtRow(),
+    };
+    mockDb.select.mockReturnValue(createChainMock([joinedRow]));
+    const result = await getMemberReservations('m1');
+    expect(result).toHaveLength(1);
+  });
+
+  it('admin can view any member reservations', async () => {
+    setAuthenticatedUser(mockCookieStore, ADMIN_USER);
+    const joinedRow = {
+      reservations: reservationRow({ memberId: 'm2' }),
+      members: memberRow({ id: 'm2' }),
+      lesson_instances: lessonInstanceRow(),
+      lesson_slots: lessonSlotRow(),
+      coaches: coachRow(),
+      courts: courtRow(),
+    };
+    mockDb.select.mockReturnValue(createChainMock([joinedRow]));
+    const result = await getMemberReservations('m2');
+    expect(result).toHaveLength(1);
+  });
+});
+
+// ── getReservationsForInstance ─────────────────────────
+
+describe('getReservationsForInstance', () => {
+  it('throws when not admin', async () => {
+    setAuthenticatedUser(mockCookieStore, MEMBER_USER);
+    await expect(getReservationsForInstance('li1')).rejects.toThrow('管理者権限が必要です');
+  });
+
+  it('returns reservations for instance', async () => {
+    setAuthenticatedUser(mockCookieStore, ADMIN_USER);
+    mockDb.select.mockReturnValue(createChainMock([reservationRow()]));
+    const result = await getReservationsForInstance('li1');
+    expect(result).toHaveLength(1);
+  });
+});
+
+// ── getAllReservationsWithDetails ──────────────────────
+
+describe('getAllReservationsWithDetails', () => {
+  it('throws when not admin', async () => {
+    setAuthenticatedUser(mockCookieStore, MEMBER_USER);
+    await expect(getAllReservationsWithDetails()).rejects.toThrow('管理者権限が必要です');
+  });
+
+  it('returns all reservations with details', async () => {
+    setAuthenticatedUser(mockCookieStore, ADMIN_USER);
+    mockDb.select.mockReturnValue(createChainMock([]));
+    const result = await getAllReservationsWithDetails();
+    expect(result).toEqual([]);
   });
 });

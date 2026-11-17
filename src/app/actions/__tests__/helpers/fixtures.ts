@@ -181,6 +181,125 @@ export function notificationRow(overrides: Record<string, unknown> = {}) {
   };
 }
 
+export function coachRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'c1',
+    name: '佐藤コーチ',
+    nameKana: 'サトウコーチ',
+    email: 'coach@test.com',
+    phone: '090-0000-0001',
+    specialties: ['beginner', 'intermediate'],
+    bio: 'テニス歴20年',
+    certifications: ['JTA公認'],
+    avatarColor: '#EF4444',
+    isActive: true,
+    createdAt: NOW,
+    updatedAt: NOW,
+    ...overrides,
+  };
+}
+
+export function courtRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'ct1',
+    name: 'コートA',
+    type: 'indoor',
+    surface: 'hard',
+    capacity: 4,
+    isActive: true,
+    ...overrides,
+  };
+}
+
+export function lessonRecordRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'lr1',
+    lessonInstanceId: 'li1',
+    theme: 'フォアハンド',
+    content: 'フォアハンドの基礎練習',
+    memberNotes: [
+      {
+        memberId: 'm1',
+        attendance: 'present',
+        performanceRating: 4,
+        goodPoints: 'フォームが安定',
+        improvementPoints: 'フットワーク',
+        memo: '',
+      },
+    ],
+    createdAt: NOW,
+    updatedAt: NOW,
+    ...overrides,
+  };
+}
+
+export function eventRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'e1',
+    title: 'テニス大会',
+    description: '年末テニス大会',
+    eventDate: '2099-12-01',
+    startTime: '09:00',
+    endTime: '17:00',
+    courtId: 'ct1',
+    maxParticipants: 32,
+    targetLevel: null,
+    fee: 5000,
+    isPublished: true,
+    createdAt: NOW,
+    updatedAt: NOW,
+    ...overrides,
+  };
+}
+
+export function eventRegistrationRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'er1',
+    eventId: 'e1',
+    memberId: 'm1',
+    status: 'registered',
+    registeredAt: NOW,
+    cancelledAt: null,
+    notes: '',
+    ...overrides,
+  };
+}
+
+export function trialApplicationRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'ta1',
+    name: '山田花子',
+    nameKana: 'ヤマダハナコ',
+    email: 'yamada@test.com',
+    phone: '090-9999-8888',
+    preferredLevel: 'beginner',
+    preferredDate: '2099-03-15',
+    preferredTime: '10:00',
+    message: 'よろしくお願いします',
+    status: 'pending',
+    adminNotes: '',
+    reviewedAt: null,
+    createdAt: NOW,
+    ...overrides,
+  };
+}
+
+export function emailVerificationRow(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'ev1',
+    email: 'new@test.com',
+    code: '123456',
+    name: '新規ユーザー',
+    nameKana: 'シンキユーザー',
+    phone: '090-0000-0000',
+    password: 'hashed-password',
+    attempts: 0,
+    expiresAt: d('2099-12-31T00:00:00Z'),
+    createdAt: NOW,
+    ...overrides,
+  };
+}
+
 export function lessonSlotRow(overrides: Record<string, unknown> = {}) {
   return {
     id: 'ls1',

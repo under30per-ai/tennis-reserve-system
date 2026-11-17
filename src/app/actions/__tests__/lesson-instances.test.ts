@@ -5,7 +5,7 @@ import {
   ADMIN_USER,
   MEMBER_USER,
 } from './helpers/mock-auth';
-import { lessonInstanceRow, reservationRow } from './helpers/fixtures';
+import { lessonInstanceRow, reservationRow, lessonSlotRow, coachRow, courtRow } from './helpers/fixtures';
 import { createChainMock } from './helpers/mock-db';
 
 // ── Mocks ─────────────────────────────────────────────
@@ -43,9 +43,18 @@ vi.mock('@/lib/audit-log', () => ({
 
 // ── Import after mocks ────────────────────────────────
 
-const { cancelLessonInstance, generateLessonInstances } = await import(
-  '@/app/actions/lesson-instances'
-);
+const {
+  cancelLessonInstance,
+  generateLessonInstances,
+  getLessonInstances,
+  getLessonInstanceById,
+  updateLessonInstance,
+  getLessonInstancesByDate,
+  getLessonInstancesByDateRange,
+  getLessonInstanceWithDetails,
+  getInstancesWithDetailsForDate,
+  getInstancesWithDetailsForDateRange,
+} = await import('@/app/actions/lesson-instances');
 
 beforeEach(() => {
   mockCookieStore._store.clear();
@@ -188,5 +197,160 @@ describe('generateLessonInstances', () => {
     );
     expect(result).toHaveLength(0);
     expect(mockDb.insert).not.toHaveBeenCalled();
+  });
+});
+
+// ── getLessonInstances ─────────────────────────────────
+
+describe('getLessonInstances', () => {
+  it('throws when not authenticated', async () => {
+    await expect(getLessonInstances()).rejects.toThrow('認証が必要です');
+  });
+
+  it('returns instances for authenticated user', async () => {
+    setAuthenticatedUser(mockCookieStore, MEMBER_USER);
+    mockDb.select.mockReturnValue(createChainMock([lessonInstanceRow()]));
+    const result = await getLessonInstances();
+    expect(result).toHaveLength(1);
+  });
+});
+
+// ── getLessonInstanceById ──────────────────────────────
+
+describe('getLessonInstanceById', () => {
+  it('throws when not authenticated', async () => {
+    await expect(getLessonInstanceById('li1')).rejects.toThrow('認証が必要です');
+  });
+
+  it('returns instance when found', async () => {
+    setAuthenticatedUser(mockCookieStore, MEMBER_USER);
+    mockDb.select.mockReturnValue(createChainMock([lessonInstanceRow()]));
+    const result = await getLessonInstanceById('li1');
+    expect(result).not.toBeNull();
+  });
+
+  it('returns null when not found', async () => {
+    setAuthenticatedUser(mockCookieStore, MEMBER_USER);
+    mockDb.select.mockReturnValue(createChainMock([]));
+    expect(await getLessonInstanceById('li-none')).toBeNull();
+  });
+});
+
+// ── updateLessonInstance ──────────────────────────────
+
+describe('updateLessonInstance', () => {
+  it('throws when not admin', async () => {
+    setAuthenticatedUser(mockCookieStore, MEMBER_USER);
+    await expect(updateLessonInstance('li1', { startTime: '11:00' })).rejects.toThrow('管理者権限が必要です');
+  });
+
+  it('updates instance for admin', async () => {
+    setAuthenticatedUser(mockCookieStore, ADMIN_USER);
+    mockDb.update.mockReturnValue(createChainMock([lessonInstanceRow({ startTime: '11:00' })]));
+    const result = await updateLessonInstance('li1', { startTime: '11:00' });
+    expect(result).not.toBeNull();
+  });
+
+  it('returns null when not found', async () => {
+    setAuthenticatedUser(mockCookieStore, ADMIN_USER);
+    mockDb.update.mockReturnValue(createChainMock([]));
+    expect(await updateLessonInstance('li-none', { startTime: '11:00' })).toBeNull();
+  });
+});
+
+// ── getLessonInstancesByDate ───────────────────────────
+
+describe('getLessonInstancesByDate', () => {
+  it('throws when not authenticated', async () => {
+    await expect(getLessonInstancesByDate('2024-12-15')).rejects.toThrow('認証が必要です');
+  });
+
+  it('returns instances for given date', async () => {
+    setAuthenticatedUser(mockCookieStore, MEMBER_USER);
+    mockDb.select.mockReturnValue(createChainMock([lessonInstanceRow()]));
+    const result = await getLessonInstancesByDate('2024-12-15');
+    expect(result).toHaveLength(1);
+  });
+});
+
+// ── getLessonInstancesByDateRange ──────────────────────
+
+describe('getLessonInstancesByDateRange', () => {
+  it('throws when not authenticated', async () => {
+    await expect(getLessonInstancesByDateRange('2024-01-01', '2024-01-31')).rejects.toThrow('認証が必要です');
+  });
+
+  it('returns instances in date range', async () => {
+    setAuthenticatedUser(mockCookieStore, MEMBER_USER);
+    mockDb.select.mockReturnValue(createChainMock([lessonInstanceRow()]));
+    const result = await getLessonInstancesByDateRange('2024-01-01', '2024-12-31');
+    expect(result).toHaveLength(1);
+  });
+
+  it('throws for invalid date format', async () => {
+    setAuthenticatedUser(mockCookieStore, MEMBER_USER);
+    await expect(getLessonInstancesByDateRange('bad', '2024-01-31')).rejects.toThrow('日付');
+  });
+});
+
+// ── getLessonInstanceWithDetails ───────────────────────
+
+describe('getLessonInstanceWithDetails', () => {
+  it('throws when not authenticated', async () => {
+    await expect(getLessonInstanceWithDetails('li1')).rejects.toThrow('認証が必要です');
+  });
+
+  it('returns null when not found', async () => {
+    setAuthenticatedUser(mockCookieStore, MEMBER_USER);
+    mockDb.select.mockReturnValue(createChainMock([]));
+    expect(await getLessonInstanceWithDetails('li-none')).toBeNull();
+  });
+
+  it('returns instance with details', async () => {
+    setAuthenticatedUser(mockCookieStore, MEMBER_USER);
+    const joinedRow = {
+      lesson_instances: lessonInstanceRow(),
+      lesson_slots: lessonSlotRow(),
+      coaches: coachRow(),
+      courts: courtRow(),
+    };
+    let c = 0;
+    mockDb.select.mockImplementation(() => {
+      c++;
+      if (c === 1) return createChainMock([joinedRow]); // instance join
+      return createChainMock([]); // reservations
+    });
+    const result = await getLessonInstanceWithDetails('li1');
+    expect(result).not.toBeNull();
+  });
+});
+
+// ── getInstancesWithDetailsForDate ────────────────────
+
+describe('getInstancesWithDetailsForDate', () => {
+  it('throws when not authenticated', async () => {
+    await expect(getInstancesWithDetailsForDate('2024-12-15')).rejects.toThrow('認証が必要です');
+  });
+
+  it('returns instances with details for date', async () => {
+    setAuthenticatedUser(mockCookieStore, MEMBER_USER);
+    mockDb.select.mockReturnValue(createChainMock([]));
+    const result = await getInstancesWithDetailsForDate('2024-12-15');
+    expect(result).toEqual([]);
+  });
+});
+
+// ── getInstancesWithDetailsForDateRange ───────────────
+
+describe('getInstancesWithDetailsForDateRange', () => {
+  it('throws when not authenticated', async () => {
+    await expect(getInstancesWithDetailsForDateRange('2024-01-01', '2024-01-31')).rejects.toThrow('認証が必要です');
+  });
+
+  it('returns instances with details for date range', async () => {
+    setAuthenticatedUser(mockCookieStore, MEMBER_USER);
+    mockDb.select.mockReturnValue(createChainMock([]));
+    const result = await getInstancesWithDetailsForDateRange('2024-01-01', '2024-12-31');
+    expect(result).toEqual([]);
   });
 });
