@@ -52,6 +52,10 @@ describe('containsProhibitedContent', () => {
     expect(containsProhibitedContent('エロ動画')).toBe(true);
   });
 
+  it('detects ちんちん', () => {
+    expect(containsProhibitedContent('ちんちん')).toBe(true);
+  });
+
   // Scam
   it('detects scam words', () => {
     expect(containsProhibitedContent('儲かる話があります')).toBe(true);
