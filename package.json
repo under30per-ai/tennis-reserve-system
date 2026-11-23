@@ -18,17 +18,17 @@
     "db:migrate-passwords": "npx tsx scripts/migrate-passwords.ts"
   },
   "dependencies": {
-    "@neon/config": "^1.13.0",
-    "@neon/env": "^2.1.0",
+    "@neon/config": "^1.14.5",
+    "@neon/env": "^2.1.8",
     "@neondatabase/serverless": "^1.2.1",
-    "@sentry/nextjs": "^11.11.0",
+    "@sentry/nextjs": "^11.16.0",
     "clsx": "^2.1.1",
     "date-fns": "^4.4.0",
     "drizzle-orm": "^0.45.4",
     "next": "16.4.6",
     "react": "19.3.1",
     "react-dom": "19.3.1",
-    "resend": "^6.38.1",
+    "resend": "^6.39.0",
     "uuid": "^14.0.3"
   },
   "devDependencies": {
