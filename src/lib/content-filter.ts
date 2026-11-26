@@ -24,7 +24,7 @@ const DISCRIMINATORY_WORDS = [
 
 // 性的表現
 const SEXUAL_WORDS = [
-  'セックス', 'SEX', 'sex',
+  'セックス', 'せっくす', 'SEX', 'sex',
   'エロ', 'えろ', 'エッチ', 'えっち',
   'オナニー', 'おなにー',
   'レイプ', 'れいぷ', '強姦',
