@@ -25,7 +25,13 @@ export default function MyReservationsPage() {
   const [tab, setTab] = useState('upcoming');
   const [cancelTarget, setCancelTarget] = useState<string | null>(null);
 
-  const today = toISODateString(new Date());
+  const now = new Date();
+  const today = toISODateString(now);
+  const nowTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+  const isPastLesson = (r: ReservationWithDetails) =>
+    r.lessonInstance.date < today ||
+    (r.lessonInstance.date === today && r.lessonInstance.startTime <= nowTime);
 
   // Identify confirmed reservations whose lesson was cancelled by admin (exclude already-transferred ones)
   const lessonCancelledReservations = useMemo(() => {
@@ -44,7 +50,7 @@ export default function MyReservationsPage() {
 
   const upcoming = reservations.filter(r => {
     if (r.status !== 'confirmed' && r.status !== 'waitlisted') return false;
-    if (r.lessonInstance.date < today) return false;
+    if (isPastLesson(r)) return false;
     return !r.lessonInstance.isCancelled;
   }).sort((a, b) =>
     a.lessonInstance.date.localeCompare(b.lessonInstance.date) ||
@@ -52,7 +58,7 @@ export default function MyReservationsPage() {
   );
   const past = reservations.filter(r => {
     if (r.status === 'transferred') return false;
-    if (r.lessonInstance.date < today || r.status === 'cancelled') return true;
+    if (isPastLesson(r) || r.status === 'cancelled') return true;
     // Include lesson-cancelled reservations in past tab too
     if ((r.status === 'confirmed' || r.status === 'waitlisted') && r.lessonInstance.isCancelled) return true;
     return false;
@@ -145,7 +151,7 @@ export default function MyReservationsPage() {
                   </div>
                   <div className="flex flex-col gap-1.5 flex-shrink-0 min-w-20">
                     <Button variant="outline" size="sm" className="w-full" onClick={() => router.push(`/reserve/${res.lessonInstanceId}`)}>詳細</Button>
-                    {(res.status === 'confirmed' || res.status === 'waitlisted') && res.lessonInstance.date >= today && !isLessonCancelled && (
+                    {(res.status === 'confirmed' || res.status === 'waitlisted') && !isPastLesson(res) && !isLessonCancelled && (
                       <Button variant="danger" size="sm" className="w-full" onClick={() => setCancelTarget(res.id)}>キャンセル</Button>
                     )}
                   </div>
